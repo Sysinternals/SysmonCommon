@@ -1,0 +1,11 @@
+<Sysmon schemaversion="4.50">
+<EventFiltering>
+<ProcessCreate onmatch="include">
+<CommandLine condition="is"></CommandLine>
+<Image condition="contains"></Image>
+<Company condition="is any"></Company>
+<FileVersion condition="contains any"></FileVersion>
+<Description condition="excludes all"></Description>
+</ProcessCreate>
+</EventFiltering>
+</Sysmon>

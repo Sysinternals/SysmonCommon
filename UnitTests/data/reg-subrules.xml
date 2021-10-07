@@ -1,0 +1,20 @@
+ <Sysmon schemaversion="4.70">
+    <EventFiltering>
+  <RuleGroup name="" groupRelation="or">
+       <RegistryEvent onmatch="include">
+           <Rule groupRelation="and">
+               <TargetObject name="" condition="contains">\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\</TargetObject> 
+               <Details name="" condition="contains">\Downloads\</Details> 
+           </Rule>
+           <Rule groupRelation="and">
+               <TargetObject name="" condition="contains">\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\</TargetObject>
+               <Details name="" condition="contains">\Temporary Internet Files\Content.Outlook\</Details> 
+           </Rule>
+           <Rule groupRelation="and">
+               <TargetObject name="" condition="contains">\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\</TargetObject> 
+               <Details name="" condition="contains">\Local Settings\Temporary Internet Files\</Details> 
+           </Rule>
+       </RegistryEvent>
+ </RuleGroup>
+ </EventFiltering>
+ </Sysmon>

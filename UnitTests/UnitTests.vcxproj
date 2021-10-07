@@ -1,0 +1,217 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{cecda94d-4685-483f-b584-6830910e2b5d}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141_xp</PlatformToolset>
+    <Force-Enable-Microsoft-googletest-v140-windesktop-msvcstl-static-rt-static>true</Force-Enable-Microsoft-googletest-v140-windesktop-msvcstl-static-rt-static>
+  </PropertyGroup>
+  <Import Project="..\..\modules\Build\Sysinternals.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <CustomBuildBeforeTargets>
+    </CustomBuildBeforeTargets>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="fields.cpp" />
+    <ClCompile Include="processcache.cpp" />
+    <ClCompile Include="RuleEntry.cpp" />
+    <ClCompile Include="environmentvar.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="rules.cpp" />
+    <ClCompile Include="utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\exe\Sysmonsvc.vcxproj">
+      <Project>{803b07aa-11a6-460a-af1a-20b4e6c7ad04}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\SYS\sys.vcxproj">
+      <Project>{4438b2e1-e488-48e8-bc72-b0d6b548fdce}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="coverage.runsettings" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="structs.h" />
+    <ClInclude Include="test.h" />
+    <ClInclude Include="utils.h" />
+  </ItemGroup>
+  <ItemDefinitionGroup />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\exe\packages\gmock.v1.8.1.8.1\build\native\gmock.v1.8.targets" Condition="Exists('..\..\exe\packages\gmock.v1.8.1.8.1\build\native\gmock.v1.8.targets')" />
+  </ImportGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;USE_SYMCRYPT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>..\..\external\SymCrypt\lib\i386</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\*.obj;tdh.lib;userenv.lib;version.lib;Netapi32.lib;ws2_32.lib;mpr.lib;odbc32.lib;odbccp32.lib;Wtsapi32.lib;ole32.lib;symcrypt-fre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <AdditionalOptions>/ignore:4067 /ignore:4075 %(AdditionalOptions)</AdditionalOptions>
+      <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
+    </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <TreatOutputAsContent>
+      </TreatOutputAsContent>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <RootFolder>
+      </RootFolder>
+      <Outputs>
+      </Outputs>
+    </CustomBuildStep>
+    <PostBuildEvent>
+      <Command>mkdir $(OutDir)testdata 1&gt;nul
+copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>NTDDI_VERSION=NTDDI_WIN8;USE_SYMCRYPT;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_UNICODE;UNICODE;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions);_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>..\..\external\SymCrypt\lib\amd64</AdditionalLibraryDirectories>
+      <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\*.obj;tdh.lib;userenv.lib;version.lib;Netapi32.lib;ws2_32.lib;mpr.lib;odbc32.lib;odbccp32.lib;Wtsapi32.lib;ole32.lib;symcrypt-fre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/ignore:4067 /ignore:4075 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir $(OutDir)testdata 1&gt;nul
+copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;USE_SYMCRYPT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalLibraryDirectories>..\..\external\SymCrypt\lib\i386</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\*.obj;tdh.lib;userenv.lib;version.lib;Netapi32.lib;ws2_32.lib;mpr.lib;odbc32.lib;odbccp32.lib;Wtsapi32.lib;ole32.lib;symcrypt-fre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
+      <AdditionalOptions>/ignore:4067 /ignore:4075 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir $(OutDir)testdata 1&gt;nul
+copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <PreprocessorDefinitions>X64;NDEBUG;_CONSOLE;USE_SYMCRYPT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalLibraryDirectories>..\..\external\SymCrypt\lib\amd64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(SolutionDir)$(Platform)\$(Configuration)\*.obj;tdh.lib;userenv.lib;version.lib;Netapi32.lib;ws2_32.lib;mpr.lib;odbc32.lib;odbccp32.lib;Wtsapi32.lib;ole32.lib;symcrypt-fre.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
+      <AdditionalOptions>/ignore:4067 /ignore:4075 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir $(OutDir)testdata 1&gt;nul
+copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="..\..\modules\Build\Sysinternals.Cpp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\exe\packages\gmock.v1.8.1.8.1\build\native\gmock.v1.8.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\exe\packages\gmock.v1.8.1.8.1\build\native\gmock.v1.8.targets'))" />
+  </Target>
+</Project>

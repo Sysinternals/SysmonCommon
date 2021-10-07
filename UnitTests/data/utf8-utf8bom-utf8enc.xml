@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Sysmon schemaversion="4.30">
+  <EventFiltering>
+    <RuleGroup name="" groupRelation="or">
+      <ProcessCreate onmatch="include">
+         <CommandLine name="unicode test" condition="contains">ˆ</CommandLine>
+      </ProcessCreate>
+    </RuleGroup>
+  </EventFiltering>
+</Sysmon>

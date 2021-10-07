@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="rules.cpp" />
+    <ClCompile Include="utils.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\..\lib\native\src\gtest-all.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\..\lib\native\src\gmock-all.cc" />
+    <ClCompile Include="environmentvar.cpp" />
+    <ClCompile Include="RuleEntry.cpp" />
+    <ClCompile Include="processcache.cpp" />
+    <ClCompile Include="fields.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="coverage.runsettings" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="data">
+      <UniqueIdentifier>{d27b5b19-7bb8-4776-87db-83f5d7e4cd0d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{761873b8-9097-4d59-9c15-5c1e57998385}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="test.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="structs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
