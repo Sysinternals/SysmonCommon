@@ -291,20 +291,20 @@ public:
 
   void AddToCache()
   {
-	  ProcessAddToCache( ProcessGUID, EventHeader );
+      ProcessCache::Instance().ProcessAdd( ProcessGUID, EventHeader );
   }
 
   void RemoveFromCache()
   {
 	  auto& proc = EventHeader->m_EventBody.m_ProcessCreateEvent;
-	  ProcessRemoveFromCache( proc.m_ProcessId, &ProcessGUID, &proc.m_CreateTime );
+      ProcessCache::Instance().ProcessRemove( proc.m_ProcessId, &ProcessGUID, &proc.m_CreateTime );
   }
 
   PPROCESS_CACHE_INFORMATION GetFromCache() const
   {
 	  auto& proc = EventHeader->m_EventBody.m_ProcessCreateEvent;
 	  const PLARGE_INTEGER time = proc.m_CreateTime.QuadPart ? const_cast<PLARGE_INTEGER>( &proc.m_CreateTime ) : nullptr;
-	  return ProcessGetCache( proc.m_ProcessId, time, proc.m_ProcessObject );
+	  return ProcessCache::Instance().ProcessGet( proc.m_ProcessId, time, proc.m_ProcessObject );
   }
 
   GUID ProcessGUID;

@@ -39,11 +39,13 @@ extern "C" {
 
 #if defined _WIN64 || defined _WIN32
 
+#ifndef ALIGN_DOWN_BY
 #define ALIGN_DOWN_BY(length, alignment) \
     ((ULONG_PTR)(length) & ~(alignment - 1))
 
 #define ALIGN_UP_BY(length, alignment) \
     (ALIGN_DOWN_BY(((ULONG_PTR)(length) + alignment - 1), alignment))
+#endif // ALIGN_DOWN_BY
 
 #elif defined __linux__
 

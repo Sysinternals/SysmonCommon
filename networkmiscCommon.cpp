@@ -992,11 +992,17 @@ CString LookupAccountNameFromPID(
     char                        pathFile[32];
     FILE                        *fp = NULL;
     unsigned int                uid = 0;
+    bool                        gotUid = false;
 
-    cache = ProcessGetCache( ProcessId, Timestamp, NULL );
+    ProcessCache::Instance().LockCache();
+    cache = ProcessCache::Instance().ProcessGet( ProcessId, Timestamp, NULL );
     if (cache != NULL) {
-        uid = cache->data.m_AuthenticationId.LowPart;
-    } else {
+        uid = cache->data->m_AuthenticationId.LowPart;
+        gotUid = true;
+    }
+    ProcessCache::Instance().UnlockCache();
+
+    if (!gotUid) {
         snprintf( pathFile, 32, "/proc/%d/loginuid", ProcessId );
         fp = fopen( pathFile, "r" );
         if (fp != NULL) {

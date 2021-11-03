@@ -30,7 +30,8 @@
 #pragma warning(disable : 4189)
 
 #define _CRT_RAND_S
-#include <windows.h>
+#include <Windows.h>
+#include <VersionHelpers.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>
