@@ -24,13 +24,16 @@
 #pragma once
 
 #include <list>
+#include <vector>
+#include <unordered_map>
+#include <queue>
 
 //
 // Delay until we purge it from the list (in seconds)
 //
 #define PROCESS_CACHE_FREE_DELAY_SEC	(1*60)
 
-#define PROCESS_CACHE_FREE_DELAY     ((ULONG64)PROCESS_CACHE_FREE_DELAY_SEC * NT_ONE_SECOND)
+#define PROCESS_CACHE_FREE_DELAY     ((LONGLONG)PROCESS_CACHE_FREE_DELAY_SEC * NT_ONE_SECOND)
 
 #if defined __linux__
 #include <string>
@@ -64,32 +67,110 @@ typedef struct {
 	_bstr_t			QueryResult;
 } DNS_QUERY_DATA, *PDNS_QUERY_DATA;
 
-typedef std::list<DNS_QUERY_DATA *>	DNS_QUERY_DATA_LIST;
+typedef std::list<DNS_QUERY_DATA>	DNS_QUERY_DATA_LIST;
 
 typedef struct {
-	LIST_ENTRY 						list;
 	GUID							uniqueProcessGUID;
 	LARGE_INTEGER					removedTime;
-	DNS_QUERY_DATA_LIST				*dnsQueryCache;
+	DNS_QUERY_DATA_LIST				dnsQueryCache;
 	// must be last
-	SYSMON_PROCESS_CREATE			data;
+	PSYSMON_PROCESS_CREATE			data;
 } PROCESS_CACHE_INFORMATION, *PPROCESS_CACHE_INFORMATION;
 
+// Number of recent unique DNS queries that we cache per process
+#define DNS_CACHE_LIMIT		1000
 
-PPROCESS_CACHE_INFORMATION ProcessGetCache(
-	_In_ DWORD ProcessId,
-	_In_ const PLARGE_INTEGER time,
-	_In_opt_ PVOID ProcessObject
-);
+class ProcessCache
+{
+private:
+	ProcessCache()
+	{
+		InitializeCriticalSection( &_cacheLock );
+	}
 
-void ProcessRemoveFromCache(
-	_In_ DWORD ProcessId,
-	_In_ GUID* ProcessGuid,
-	_In_opt_ PLARGE_INTEGER EventTime );
+public:
+	static ProcessCache& Instance()
+	{
+		static ProcessCache theInstance;
 
-void ProcessAddToCache(
-	_In_ GUID uniqueProcessGUID,
-	_In_ PSYSMON_EVENT_HEADER event );
+		return theInstance;
+	}
+
+	PPROCESS_CACHE_INFORMATION ProcessGet(
+		_In_ DWORD ProcessId,
+		_In_ const PLARGE_INTEGER time,
+		_In_opt_ PVOID ProcessObject
+	);
+
+	void ProcessAdd(
+		_In_ GUID uniqueProcessGUID,
+		_In_ PSYSMON_EVENT_HEADER event
+	);
+
+	void RemoveEntries();
+
+	void ProcessRemove(
+		_In_ DWORD ProcessId,
+		_In_ GUID* ProcessGuid,
+		_In_opt_ PLARGE_INTEGER EventTime
+	);
+
+	bool Empty();
+
+#if defined _WIN64 || defined _WIN32
+	bool DnsEntryAdd(
+		_In_ DWORD ProcessId,
+		PDNS_QUERY_DATA DnsEntry
+	);
+#endif
+
+	void LockCache()
+	{
+		EnterCriticalSection(&_cacheLock);
+	}
+
+	void UnlockCache()
+	{
+		LeaveCriticalSection( &_cacheLock );
+	}
+
+private:
+	//
+	// g_ProcessCache is a hash from a ProcessId to a list of process cache pointers
+	// g_ProcessCacheRemoveTimes is an ordered hash from removal time to a g_ProcessCache iterator
+	//
+	using CacheEntries = std::list<PROCESS_CACHE_INFORMATION>;
+
+	std::unordered_map<DWORD, CacheEntries> _processCache;
+	CRITICAL_SECTION _cacheLock;
+
+	struct CacheEntryToExpire
+	{
+		CacheEntryToExpire( LONGLONG t, ULONG p ) : time( t ), pid( p )
+		{}
+
+		LONGLONG time;
+		ULONG pid;
+	};
+
+	struct OrderByOldestFirst
+	{
+		bool operator() ( const CacheEntryToExpire& first, const CacheEntryToExpire& second )
+		{
+			return second.time < first.time;
+		}
+	};
+
+	std::priority_queue<CacheEntryToExpire, std::vector<CacheEntryToExpire>, OrderByOldestFirst> _expiringProcesses;
+
+	void PurgeExpired( PLARGE_INTEGER EventTime );
+
+	bool Expired( LONGLONG time, LONGLONG reference )
+	{
+		return time + PROCESS_CACHE_FREE_DELAY < reference;
+	}
+
+};
 
 typedef enum _OBJECT_TYPE
 {
@@ -151,8 +232,6 @@ EventProcess(
 );
 
 
-
-extern CRITICAL_SECTION g_ProcessCacheLock;
 
 //--------------------------------------------------------------------
 //

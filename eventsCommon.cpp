@@ -70,21 +70,265 @@ BOOLEAN 				bPreVista = TRUE;
 BOOLEAN 				bInitialized = FALSE;
 ULONG					machineId = 0;
 
-CRITICAL_SECTION g_ProcessCacheLock;
-LIST_ENTRY g_ProcessCache;
+//--------------------------------------------------------------------
+//
+// ProcessGetCache
+//
+// Fetch a process cache entry
+//
+//--------------------------------------------------------------------
+PPROCESS_CACHE_INFORMATION ProcessCache::ProcessGet(
+	_In_ DWORD ProcessId,
+	_In_ const PLARGE_INTEGER time,
+	_In_opt_ PVOID ProcessObject
+)
+{
+	PPROCESS_CACHE_INFORMATION	ret = NULL;
+
+	LockCache();
+
+	//
+	// search for process ID in unordered map
+	//
+	auto processEntry = _processCache.find( ProcessId );
+	if( processEntry != _processCache.end() ) {
+
+		//
+		// iterate over list items for this process ID
+		//
+		for( auto &current : processEntry->second ) {
+
+			// #444 If a process object was provided, check for a match against this in addition to the PID
+			if( (ProcessObject == NULL) ||
+				(current.data->m_ProcessObject == NULL) ||
+				(current.data->m_ProcessObject == ProcessObject) ) {
+
+				if( time != NULL ) {
+
+					//
+					// If I didn't select the entry or the time of the event was
+					// before the process was removed
+					//
+					if( ret == NULL ) {
+
+						//
+						// Only if time makes sense, else we will select a wrong old entry
+						// and the latest will be skipped
+						//
+						if( (current.removedTime.QuadPart == 0 ||									// If the current entry is still open
+							(ULONG64)time->QuadPart < (ULONG64)(current.removedTime.QuadPart + NT_500_MS)) && // Or it has now terminated but terminated after the process creation time
+																									// the half second buffer is because we have seen network events appear marginally later than the process terminate event
+							(time->QuadPart >= current.data->m_CreateTime.QuadPart) ) {				// #444. We validate the end of the time window but not the start..
+
+							ret = &current;
+						}
+					} else if( current.removedTime.QuadPart != 0 &&								// The process has terminadumpted
+							   (ULONG64)time->QuadPart < (ULONG64)current.removedTime.QuadPart &&  // The process terminated after our process creation time
+							   time->QuadPart >= current.data->m_CreateTime.QuadPart &&				// #444 Validate the start of the time window too
+							   (ret->removedTime.QuadPart == 0 ||									// we are either superseding a candidate that is still open
+								   (ULONG64)ret->removedTime.QuadPart > ( ULONG64 )current.removedTime.QuadPart) ) {  // or we are superseding a process with a wider windows than the current candidate
+
+						ret = &current;
+					}
+
+				} else {
+
+					//
+					// Select the latest available;
+					//
+					if( ret == NULL ) {
+
+						ret = &current;
+					} else if( (current.removedTime.QuadPart == 0) ||
+							   ((ret->removedTime.QuadPart != 0) &&
+								   ((ULONG64)ret->removedTime.QuadPart < (ULONG64)current.removedTime.QuadPart)) ) {
+
+						ret = &current;
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	UnlockCache();
+
+	return ret;
+}
 
 //--------------------------------------------------------------------
 //
-// ProcessCacheInitialize
+// ProcessCache::RemoveEntries
 //
-// Prepare the process cache list and lock.
+// Remove all entries from the cache
 //
 //--------------------------------------------------------------------
-void ProcessCacheInitialize( void )
+void ProcessCache::RemoveEntries()
 {
-	InitializeListHead( &g_ProcessCache );
-	InitializeCriticalSection( &g_ProcessCacheLock );
+	LockCache();
+
+	//
+	// for every entry in the cache (removing after each iteration)
+	//
+	for( auto cacheEntry = _processCache.begin(); cacheEntry != _processCache.end(); cacheEntry = _processCache.erase( cacheEntry ) ) {
+
+		//
+		// iterate over list items for this process ID
+		//
+		for( auto &current : cacheEntry->second ) {
+			free( current.data );
+		}
+	}
+
+	UnlockCache();
 }
+//--------------------------------------------------------------------
+//
+// ProcessCache::ProcessRemove
+//
+// Remove an entry from the cache
+//
+//--------------------------------------------------------------------
+void ProcessCache::ProcessRemove(
+	_In_ DWORD ProcessId,
+	_In_ GUID* ProcessGuid,
+	_In_opt_ PLARGE_INTEGER EventTime
+)
+{
+	LARGE_INTEGER				currentTime;
+
+	if( EventTime == NULL ) {
+
+		GetSystemTimeAsLargeInteger( &currentTime );
+		EventTime = &currentTime;
+	}
+
+	LockCache();
+
+	//
+	// search for process ID in unordered map
+	//
+	auto processEntry = _processCache.find( ProcessId );
+	if( processEntry != _processCache.end() ) {
+
+		//
+		// iterate over list items for this process ID
+		//
+		for( auto &current : processEntry->second) {
+
+			//
+			// Mark the entry as removed, but keep it around in case
+			// we get delayed ETW events that reference it
+			//
+			current.removedTime.QuadPart = EventTime->QuadPart;
+		}
+		_expiringProcesses.emplace( EventTime->QuadPart, ProcessId );
+	}
+
+	PurgeExpired( EventTime );
+	UnlockCache();
+}
+
+void ProcessCache::PurgeExpired( PLARGE_INTEGER EventTime )
+{
+	while( !_expiringProcesses.empty() && Expired( _expiringProcesses.top().time, EventTime->QuadPart ) ) {
+		CacheEntryToExpire oldest = _expiringProcesses.top();
+		_expiringProcesses.pop();
+		auto processes = _processCache.find( oldest.pid );
+		if( processes != _processCache.end() ) {
+
+			for( auto &process : processes->second ) {
+
+				free( process.data );
+			}
+
+			_processCache.erase( oldest.pid );
+		}
+	}
+}
+
+//--------------------------------------------------------------------
+//
+// ProcessCache::ProcessAdd
+//
+// Add a process record to the process cache
+//
+//--------------------------------------------------------------------
+void ProcessCache::ProcessAdd(
+	_In_ GUID uniqueProcessGUID,
+	_In_ PSYSMON_EVENT_HEADER event
+)
+{
+	PROCESS_CACHE_INFORMATION	cacheEntry;
+	PSYSMON_PROCESS_CREATE		data;
+	SIZE_T						dataSize;
+
+	data = &event->m_EventBody.m_ProcessCreateEvent;
+
+	dataSize = event->m_EventSize - offsetof( SYSMON_EVENT_HEADER, m_EventBody );
+	cacheEntry.data = static_cast<PSYSMON_PROCESS_CREATE>( malloc( dataSize ) );
+	if( cacheEntry.data != NULL ) {
+		LockCache();
+
+		memcpy( cacheEntry.data, data, dataSize );
+
+		cacheEntry.uniqueProcessGUID = uniqueProcessGUID;
+		cacheEntry.removedTime.QuadPart = 0;
+		cacheEntry.dnsQueryCache = {};
+
+		ProcessRemove( data->m_ProcessId, &uniqueProcessGUID, NULL );
+		auto processEntry = _processCache.find( data->m_ProcessId );
+		if( processEntry == _processCache.end() ) {
+
+			_processCache.emplace( data->m_ProcessId, CacheEntries{ cacheEntry } );
+		} else {
+
+			processEntry->second.push_front( cacheEntry );
+		}
+
+		UnlockCache();
+	}
+}
+
+bool ProcessCache::Empty()
+{
+	LockCache();
+	bool ret = _processCache.empty();
+	UnlockCache();
+	return ret;
+}
+
+#if defined _WIN64 || defined _WIN32
+bool ProcessCache::DnsEntryAdd( DWORD ProcessId, PDNS_QUERY_DATA DnsEntry )
+{
+	LockCache();
+	auto processInfo = ProcessGet( ProcessId, NULL, NULL );
+	if( processInfo != NULL ) {
+
+		for( auto &cachedQuery : processInfo->dnsQueryCache) {
+			if( !_tcsicmp( cachedQuery.QueryName, DnsEntry->QueryName ) &&
+				!_tcsicmp( cachedQuery.QueryResult, DnsEntry->QueryResult ) &&
+				!_tcsicmp( cachedQuery.QueryStatus, DnsEntry->QueryStatus ) ) {
+
+				UnlockCache();
+				return false;
+			}
+		}
+
+		//
+		// Add to the cache
+		//
+		if( processInfo->dnsQueryCache.size() == DNS_CACHE_LIMIT ) {
+
+			processInfo->dnsQueryCache.pop_back();
+		}
+		// Performing a copy here, just in case.
+		processInfo->dnsQueryCache.push_front( *DnsEntry );
+	}
+	UnlockCache();
+	return true;
+}
+#endif
 
 //
 // Maximum killed processes in the cache
@@ -163,206 +407,6 @@ GUID GenerateUniqueId(
 
 //--------------------------------------------------------------------
 //
-// ProcessGetCache
-//
-// Fetch a process cache entry
-//
-//--------------------------------------------------------------------
-PPROCESS_CACHE_INFORMATION ProcessGetCache(
-	_In_ DWORD ProcessId,
-	_In_ const PLARGE_INTEGER time,
-	_In_opt_ PVOID ProcessObject
-	)
-{
-	PLIST_ENTRY 				entry;
-	PPROCESS_CACHE_INFORMATION	ret = NULL, current = NULL;
-
-	EnterCriticalSection( &g_ProcessCacheLock );
-
-	entry = g_ProcessCache.Flink;
-
-	while( entry != &g_ProcessCache ) {
-
-	    current = CONTAINING_RECORD( entry, PROCESS_CACHE_INFORMATION, list );
-
-		// #444 If a process object was provided, check for a match against this in addition to the PID
-		if( current->data.m_ProcessId == ProcessId && 
-		   ( NULL == ProcessObject || NULL == current->data.m_ProcessObject || current->data.m_ProcessObject == ProcessObject) ) {
-			
-			if( time != NULL ) {
-
-				//
-				// If I didn't select the entry or the time of the event was
-				// before the process was removed
-				//
-				if( ret == NULL ) {
-
-					//
-					// Only if time makes sense, else we will select a wrong old entry
-					// and the latest will be skipped
-					//
-					if( (current->removedTime.QuadPart == 0 ||									// If the current entry is still open
-						(ULONG64)time->QuadPart < (ULONG64)( current->removedTime.QuadPart + NT_500_MS ) ) && // Or it has now terminated but terminated after the process creation time
-																								// the half second buffer is because we have seen network events appear marginally later than the process terminate event
-						(time->QuadPart >= current->data.m_CreateTime.QuadPart) ) {				// #444. We validate the end of the time window but not the start..
-
-						ret = current;
-					}
-				} else if( current->removedTime.QuadPart != 0 &&								// The process has terminadumpted
-						   (ULONG64)time->QuadPart < (ULONG64)current->removedTime.QuadPart &&  // The process terminated after our process creation time
-						   time->QuadPart >= current->data.m_CreateTime.QuadPart &&				// #444 Validate the start of the time window too
-						   ( ret->removedTime.QuadPart == 0 ||									// we are either superseding a candidate that is still open
-							 (ULONG64)ret->removedTime.QuadPart > (ULONG64)current->removedTime.QuadPart ) ) {  // or we are superseding a process with a wider windows than the current candidate
-
-					ret = current;
-				}
-
-			} else {
-
-				//
-				// Select the latest available;
-				//
-				if( ret == NULL ) {
-
-					ret = current;
-				} else if( current->removedTime.QuadPart == 0 ||
-						   (ret->removedTime.QuadPart != 0 &&
-							(ULONG64)ret->removedTime.QuadPart < (ULONG64)current->removedTime.QuadPart) ) {
-
-					ret = current;
-				}
-				break;
-			}
-		}
-
-		entry = entry->Flink;
-	}
-
-	LeaveCriticalSection( &g_ProcessCacheLock );
-
-	return ret;
-}
-
-//--------------------------------------------------------------------
-//
-// ProcessRemoveFromCache
-//
-// Remove an entry from the cache
-//
-//--------------------------------------------------------------------
-void ProcessRemoveFromCache(
-	_In_ DWORD ProcessId,
-	_In_ GUID* ProcessGuid,
-	_In_opt_ PLARGE_INTEGER EventTime
-	)
-{
-	PLIST_ENTRY 				entry;
-	PPROCESS_CACHE_INFORMATION	current = NULL;
-	LARGE_INTEGER				currentTime;
-	LONGLONG					entryTime;
-
-	if( EventTime == NULL ) {
-		
-		GetSystemTimeAsLargeInteger( &currentTime );
-		EventTime = &currentTime;
-	}
-	
-	EnterCriticalSection( &g_ProcessCacheLock );
-
-	entry = g_ProcessCache.Flink;
-
-	while( entry != &g_ProcessCache ) {
-
-	    current = CONTAINING_RECORD( entry, PROCESS_CACHE_INFORMATION, list );
-		entry = entry->Flink;
-
-		//
-		// Purge the entry or mark the process removed
-		//
-		entryTime = current->removedTime.QuadPart;
-		if( entryTime != 0 ) {
-
-			//
-			// If the cache is flooded or the entry timed out, purge.
-			//
-			if( (ULONG64)(entryTime + PROCESS_CACHE_FREE_DELAY) < (ULONG64)EventTime->QuadPart ) {
-
-				RemoveEntryList( &current->list );
-
-				while( !current->dnsQueryCache->empty() ) {
-
-					delete current->dnsQueryCache->front();
-					current->dnsQueryCache->pop_front();
-				}
-				delete current->dnsQueryCache;
-				free( current );
-			}
-		} else if( current->data.m_ProcessId == ProcessId ) {
-
-			//
-			// Mark the entry as removed, but keep it around in case
-			// we get delayed ETW events that reference it
-			//
-			current->removedTime.QuadPart = EventTime->QuadPart;
-		}
-	}
-
-	LeaveCriticalSection( &g_ProcessCacheLock );
-}
-
-//--------------------------------------------------------------------
-//
-// ProcessAddToCache
-//
-// Add a process record to the process cache
-//
-//--------------------------------------------------------------------
-void ProcessAddToCache(
-	_In_ GUID uniqueProcessGUID,
-	_In_ PSYSMON_EVENT_HEADER event
-	)
-{
-	PPROCESS_CACHE_INFORMATION	cacheEntry;
-	SIZE_T						allocSize;
-	PSYSMON_PROCESS_CREATE		data;
-	SIZE_T						dataSize;
-
-	data = &event->m_EventBody.m_ProcessCreateEvent;
-
-	dataSize = event->m_EventSize - offsetof(SYSMON_EVENT_HEADER, m_EventBody);
-	allocSize = sizeof(*cacheEntry) - sizeof(*data) + dataSize;
-	cacheEntry = (PPROCESS_CACHE_INFORMATION) malloc( allocSize );
-
-	if( cacheEntry ) {
-
-		ZeroMemory( cacheEntry, allocSize );
-		cacheEntry->dnsQueryCache = new DNS_QUERY_DATA_LIST;
-		cacheEntry->uniqueProcessGUID = uniqueProcessGUID;
-		memcpy( &cacheEntry->data, data, dataSize );
-
-		EnterCriticalSection( &g_ProcessCacheLock );
-		ProcessRemoveFromCache( data->m_ProcessId, &uniqueProcessGUID, NULL );
-		InsertHeadList( &g_ProcessCache, &cacheEntry->list );
-		LeaveCriticalSection( &g_ProcessCacheLock );
-	}
-}
-
-//--------------------------------------------------------------------
-// ProcessCacheEmpty
-//
-// Quick test to check if the cache is empty.
-//
-//--------------------------------------------------------------------
-bool ProcessCacheEmpty()
-{
-	EnterCriticalSection( &g_ProcessCacheLock );
-	bool ret = IsListEmpty( &g_ProcessCache );
-	LeaveCriticalSection( &g_ProcessCacheLock );
-	return ret;
-}
-
-//--------------------------------------------------------------------
-//
 // GenerateUniquePGUID
 //
 // Generate a unique GUID for the process
@@ -383,7 +427,7 @@ void GenerateUniquePGUID(
 	// Update the cache
 	if( Cache ) {
 		
-		ProcessAddToCache( g, event );
+		ProcessCache::Instance().ProcessAdd( g, event );
 	}
 
 	*pguid = g;
@@ -408,17 +452,17 @@ void FetchUniquePGUID(
 	BOOL   						result;
 	PSYSMON_EVENT_HEADER		event;
 
-	EnterCriticalSection( &g_ProcessCacheLock );
+	ProcessCache::Instance().LockCache();
 	
-	cache = ProcessGetCache( ProcessId, time, NULL);
+	cache = ProcessCache::Instance().ProcessGet( ProcessId, time, NULL );
 
 	if( cache ) {
 
 		*pguid = cache->uniqueProcessGUID;
-		LeaveCriticalSection( &g_ProcessCacheLock );
+		ProcessCache::Instance().UnlockCache();
 	} else {
 		
-		LeaveCriticalSection( &g_ProcessCacheLock );
+		ProcessCache::Instance().UnlockCache();
 
 #if defined _WIN64 || defined _WIN32
         DWORD						bytesReturned = 1;
@@ -1079,13 +1123,13 @@ VOID FetchImageName(
 	//
 	// Look at the cache first
 	//
-	EnterCriticalSection( &g_ProcessCacheLock );
+	ProcessCache::Instance().LockCache();
 	
-	cache = ProcessGetCache( ProcessId, time , NULL);
+	cache = ProcessCache::Instance().ProcessGet( ProcessId, time , NULL );
 
 	if( cache ) {
 		
-		processInfo = &cache->data;	
+		processInfo = cache->data;	
 		imagePath = ExtTranslateNtPath( processInfo->m_Extensions, processInfo + 1,
 										PC_ImagePath );		
 
@@ -1095,7 +1139,7 @@ VOID FetchImageName(
 		free( imagePath );
 	}
 
-	LeaveCriticalSection( &g_ProcessCacheLock );
+	ProcessCache::Instance().UnlockCache();
 
 	//
 	// The cache was successfully used
@@ -1503,19 +1547,19 @@ EventResolveField(
 		//
 		// Resolve parent information
 		//
-		EnterCriticalSection( &g_ProcessCacheLock );
+		ProcessCache::Instance().LockCache();
 
 		// #444. Check by process object as well as process ID to minimise the effects of PID reuse..
-		parentInfo = ProcessGetCache( EventHeader->m_EventBody.m_ProcessCreateEvent.m_ParentProcessId,
+		parentInfo = ProcessCache::Instance().ProcessGet( EventHeader->m_EventBody.m_ProcessCreateEvent.m_ParentProcessId,
 									  &EventHeader->m_EventBody.m_ProcessCreateEvent.m_CreateTime,
 									  EventHeader->m_EventBody.m_ProcessCreateEvent.m_ParentProcessObject);
 		if( parentInfo ) {
 
-			D_ASSERT( Time->QuadPart >= parentInfo->data.m_CreateTime.QuadPart );
+			D_ASSERT( Time->QuadPart >= parentInfo->data->m_CreateTime.QuadPart );
 
 			switch( FieldIndex ) {
 			case F_CP_ParentCommandLine:
-				EventSetFieldE( EventBuffer, F_CP_ParentCommandLine, N_UnicodeString, &parentInfo->data, PC_CommandLine );
+				EventSetFieldE( EventBuffer, F_CP_ParentCommandLine, N_UnicodeString, parentInfo->data, PC_CommandLine );
 				break;
 			case F_CP_ParentProcessGuid:
 				EventSetFieldX( EventBuffer, F_CP_ParentProcessGuid, N_GUID, parentInfo->uniqueProcessGUID );
@@ -1525,16 +1569,16 @@ EventResolveField(
 				EventFieldDup( EventBuffer, F_CP_ParentProcessGuid );
 				break;
 			case F_CP_ParentImage:
-				EventSetFieldE( EventBuffer, F_CP_ParentImage, N_UnicodePath, &parentInfo->data, PC_ImagePath );
+				EventSetFieldE( EventBuffer, F_CP_ParentImage, N_UnicodePath, parentInfo->data, PC_ImagePath );
 				break;
 			case F_CP_ParentUser:
-				TranslateSid( (PSID)ExtGetPtrX( &parentInfo->data, PC_Sid, nullptr ), tmpStringBuffer, _countof( tmpStringBuffer ) );
+				TranslateSid( (PSID)ExtGetPtrX( parentInfo->data, PC_Sid, nullptr ), tmpStringBuffer, _countof( tmpStringBuffer ) );
 				EventSetFieldS( EventBuffer, F_CP_ParentUser, _tcsdup( tmpStringBuffer ), TRUE );
 				break;
 			}
 		}
 
-		LeaveCriticalSection( &g_ProcessCacheLock );
+		ProcessCache::Instance().UnlockCache();
 
 		if( parentInfo == NULL ) {
 
@@ -1697,16 +1741,16 @@ EventResolveField(
 		// For DNS users, the ProcessID is used as input for resolving.
 		if( ( EventType == &SYSMONEVENT_DNS_QUERY_Type && FieldIndex == F_DQ_User ) ||
 			( EventType == &SYSMONEVENT_CLIPBOARD_Type && FieldIndex == F_C_User ) ) {
-			EnterCriticalSection( &g_ProcessCacheLock );
+			ProcessCache::Instance().LockCache();
 
-			parentInfo = ProcessGetCache( *(ULONG*)ptr, nullptr, nullptr );
+			parentInfo = ProcessCache::Instance().ProcessGet( *(ULONG*)ptr, nullptr, nullptr );
 			if( parentInfo ) {
 
-				TranslateSid( (PSID)ExtGetPtrX( &parentInfo->data, PC_Sid, nullptr ), tmpStringBuffer, _countof( tmpStringBuffer ) );
+				TranslateSid( (PSID)ExtGetPtrX( parentInfo->data, PC_Sid, nullptr ), tmpStringBuffer, _countof( tmpStringBuffer ) );
 				EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
 			}
 
-			LeaveCriticalSection( &g_ProcessCacheLock );
+			ProcessCache::Instance().UnlockCache();
 
 			if( parentInfo == NULL ) {
 
@@ -2749,7 +2793,7 @@ DWORD DispatchEvent(
 		EventSetFieldE( eventBuffer, F_PT_User, N_Sid, processTerminate, PT_Sid );
 
 		EventProcess( &SYSMONEVENT_PROCESS_TERMINATE_Type, eventBuffer, eventHeader, (PSID)ExtGetPtrX( processTerminate, PT_Sid, NULL ) );
-		ProcessRemoveFromCache( processTerminate->m_ProcessId, NULL, &processTerminate->m_EventTime );
+		ProcessCache::Instance().ProcessRemove( processTerminate->m_ProcessId, NULL, &processTerminate->m_EventTime );
 		break;
 
 	case FileDelete:

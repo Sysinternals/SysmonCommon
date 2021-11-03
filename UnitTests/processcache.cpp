@@ -61,14 +61,15 @@ PROCESSCACHE_FETCH_TEST fetches[] = {
 	},
 };
 
+
 // Fetch tests adding and getting entries from the process cache.
-TEST( ProcessCache, Fetch )
+TEST( ProcessCacheTests, Fetch )
 {
 	for( auto& fetch : fetches ) {
         SCOPED_TRACE( fetch.Description );
 
-        ProcessCacheInitialize();
-		ASSERT_TRUE( ProcessCacheEmpty() );
+		ProcessCache::Instance().RemoveEntries();
+		ASSERT_TRUE( ProcessCache::Instance().Empty() );
 
 		std::map<ULONG64, ULONG64> pkeyTimeMap;
 
@@ -99,7 +100,7 @@ TEST( ProcessCache, Fetch )
 				proc.m_CreateTime.QuadPart = pkeyTimeMap[proc.m_ProcessKey];
 			}
 
-			ASSERT_EQ( 0, memcmp( &cacheEntry->data, &proc, sizeof( cacheEntry->data ) ) );
+			ASSERT_EQ( 0, memcmp( cacheEntry->data, &proc, sizeof( *cacheEntry->data ) ) );
 		}
 
         // Check non-expected entries.
@@ -110,38 +111,38 @@ TEST( ProcessCache, Fetch )
 }
 
 // Remove checks behaviour while adding and removing entries.
-TEST( ProcessCache, Remove )
+TEST( ProcessCacheTests, Remove )
 {
 	ProcessCacheEntry first( 1, 1, 1, nullptr );
 	ProcessCacheEntry firstAfter( 1, 1, 2, nullptr );
 	ULONG64 expired = PROCESS_CACHE_FREE_DELAY + first.EventHeader->m_EventBody.m_ProcessCreateEvent.m_CreateTime.QuadPart + 1;
 	ProcessCacheEntry late( 2, 2, expired, nullptr );
 
-	ProcessCacheInitialize();
-	ASSERT_TRUE( ProcessCacheEmpty() );
+	ProcessCache::Instance().RemoveEntries();
+	ASSERT_TRUE( ProcessCache::Instance().Empty() );
 
     // Add to cache, check cache is not empty and entry is here.
 	first.AddToCache();
-	ASSERT_FALSE( ProcessCacheEmpty() );
+	ASSERT_FALSE( ProcessCache::Instance().Empty() );
 	ASSERT_NE( nullptr, first.GetFromCache() );
 
     // Remove from cache, just mark as removed but stay for delay.
 	first.RemoveFromCache();
-	ASSERT_FALSE( ProcessCacheEmpty() );
+	ASSERT_FALSE( ProcessCache::Instance().Empty() );
 	ASSERT_NE( nullptr, first.GetFromCache() );
 
     // Remove an entry later, clean the cache.
 	late.RemoveFromCache();
-	ASSERT_TRUE( ProcessCacheEmpty() );
+	ASSERT_TRUE( ProcessCache::Instance().Empty() );
 
-    // Add two entries, one is autmatically marked as removed.
+    // Add two entries, one is automatically marked as removed.
 	first.AddToCache();
 	ASSERT_NE( nullptr, first.GetFromCache() );
 	ASSERT_EQ( 0, first.GetFromCache()->removedTime.QuadPart );
 	firstAfter.AddToCache();
 	ASSERT_NE( nullptr, first.GetFromCache() );
 	ASSERT_NE( 0, first.GetFromCache()->removedTime.QuadPart );
-	ASSERT_FALSE( ProcessCacheEmpty() );
+	ASSERT_FALSE( ProcessCache::Instance().Empty() );
 
     // Removing the late entry does nothing because removedTime is aligned with current time.
 	late.RemoveFromCache();
@@ -154,11 +155,11 @@ TEST( ProcessCache, Remove )
 	lateCreateTime.QuadPart = cacheEntry->removedTime.QuadPart;
 	lateCreateTime.QuadPart += PROCESS_CACHE_FREE_DELAY + 1;
 	late.RemoveFromCache();
-	ASSERT_TRUE( ProcessCacheEmpty() );
+	ASSERT_TRUE( ProcessCache::Instance().Empty() );
 }
 
 // ParentProcess checks parent user information can be resolved from the cache.
-TEST( ProcessCache, ParentProcessUser) {
+TEST( ProcessCacheTests, ParentProcessUser) {
 	SYSMON_DATA_DESCRIPTOR eventBuffer[SYSMON_MAX_EVENT_Fields] = {};
 	EVENT_DATA_DESCRIPTOR outputBuffer[SYSMON_MAX_EVENT_Fields] = {};
 	SYSMON_EVENT_HEADER eventHeader = {};
@@ -173,8 +174,8 @@ TEST( ProcessCache, ParentProcessUser) {
 	PSID parentUserSid = nullptr;
 	ASSERT_TRUE( ConvertStringSidToSid( _T("S-1-5-18"), &parentUserSid ) );
 
-	ProcessCacheInitialize();
-	ASSERT_TRUE( ProcessCacheEmpty() );
+	ProcessCache::Instance().RemoveEntries();
+	ASSERT_TRUE( ProcessCache::Instance().Empty() );
 
 	PTCHAR* parentUser = reinterpret_cast<PTCHAR*>(&outputBuffer[F_CP_ParentUser].Ptr);
 

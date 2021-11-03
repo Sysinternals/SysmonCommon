@@ -23,7 +23,6 @@
     <Keyword>Win32Proj</Keyword>
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141_xp</PlatformToolset>
     <Force-Enable-Microsoft-googletest-v140-windesktop-msvcstl-static-rt-static>true</Force-Enable-Microsoft-googletest-v140-windesktop-msvcstl-static-rt-static>
   </PropertyGroup>
   <Import Project="..\..\modules\Build\Sysinternals.Cpp.props" />
@@ -81,7 +80,7 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
-      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include;..\..\sysmonCommon</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
     </ClCompile>
@@ -133,9 +132,8 @@ copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include;..\..\sysmonCommon</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -161,7 +159,7 @@ copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include;..\..\sysmonCommon</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -189,7 +187,7 @@ copy $(ProjectDir)data\* $(OutDir)testdata 1&gt;nul</Command>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4005;4324;4201;4100;4204;4512;4359</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\SymCrypt\inc;..\..\modules\Common;$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories);..\..\modules\libxml2\include;..\..\sysmonCommon</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
