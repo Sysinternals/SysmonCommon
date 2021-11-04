@@ -55,7 +55,7 @@ DumpConfiguration(
 	DWORD			regType, options;
 	DWORD			hashingAlgorithm = DEFAULT_CRYPTO;
 	PTCHAR			hash;
-#else
+#elif defined __linux__
     int             rulesFd = 0;
 #endif
 	RULE_CONTEXT    ruleContext;
@@ -300,7 +300,9 @@ DumpConfiguration(
 						continue;
 					}
 
-#if defined __linux__
+#if defined _WIN64 || defined _WIN32
+                    PTCHAR ruleFilterData = (PTCHAR)ruleFilter->Data;
+#elif defined __linux__
                     int ruleFilterDataSize = WideStrlen((PWCHAR)(ruleFilter->Data)) + 1;
                     CHAR ruleFilterData[ruleFilterDataSize * 4];
                     UTF16toUTF8(ruleFilterData, (PWCHAR)(ruleFilter->Data), ruleFilterDataSize * 4);
@@ -313,46 +315,33 @@ DumpConfiguration(
 							PRULE_CONTEXT pContext = &ruleContext;
 							PRULE_AGGREGATION pAggregation = AGGREGATION_FROM_OFFSET(pContext, ruleFilter->AggregationOffset);
 
+							if (WCSLEN( pAggregation->name )) {
 #if defined _WIN64 || defined _WIN32
-							if (wcslen(pAggregation->name))
-								_tprintf_s(_T("\tCompound Rule %.32s   combine using %s\n"), pAggregation->name, 
-									RuleCombineOR == pAggregation->combineType ? _T("Or") : RuleCombineAND == pAggregation->combineType ? _T("And") : _T("Unknown"));
-							else
-								_tprintf_s(_T("\tCompound Rule %04d   combine using %s\n"), ruleFilter->AggregationId,
-									RuleCombineOR == pAggregation->combineType ? _T("Or") : RuleCombineAND == pAggregation->combineType ? _T("And") : _T("Unknown"));
-#elif __linux__
-                            int aggNameSize = sizeof(pAggregation->name) / sizeof(pAggregation->name[0]);
-                            CHAR aggName[aggNameSize];
-                            UTF16toUTF8(aggName, pAggregation->name, aggNameSize);
-                            if( WideStrlen( pAggregation->name ) )
+                                PTCHAR aggName = pAggregation->name;
+#elif defined __linux__
+                                int aggNameSize = sizeof(pAggregation->name) / sizeof(pAggregation->name[0]);
+                                CHAR aggName[aggNameSize];
+                                UTF16toUTF8(aggName, pAggregation->name, aggNameSize);
+#endif
                                 _tprintf_s(_T("\tCompound Rule %.32s   combine using %s\n"), aggName,
                                     RuleCombineOR == pAggregation->combineType ? _T("Or") : RuleCombineAND == pAggregation->combineType ? _T("And") : _T("Unknown"));
-                            else
-                                _tprintf_s(_T("\tCompound Rule %04d   combine using %s\n"), ruleFilter->AggregationId,
-                                    RuleCombineOR == pAggregation->combineType ? _T("Or") : RuleCombineAND == pAggregation->combineType ? _T("And") : _T("Unknown"));
-#endif
+							} else {
+								_tprintf_s(_T("\tCompound Rule %04d   combine using %s\n"), ruleFilter->AggregationId,
+									RuleCombineOR == pAggregation->combineType ? _T("Or") : RuleCombineAND == pAggregation->combineType ? _T("And") : _T("Unknown"));
+                            }
+
 							currentAggregation = ruleFilter->AggregationId;
 						}
 #if 0
 						_tprintf(_T("\t    [0x%04x] %-30s filter: %-12s value: '%s'\n"), ruleFilter->AggregationId, fieldName,
-							GetFilterName(ruleFilter->FilterType), (LPTSTR)ruleFilter->Data);
+							GetFilterName(ruleFilter->FilterType), ruleFilterData);
 #endif
-#if defined _WIN64 || defined _WIN32
-						_tprintf(_T("\t    %-30s filter: %-12s value: '%s'\n"), fieldName,
-							GetFilterName(ruleFilter->FilterType), (LPTSTR)ruleFilter->Data);
-#elif defined __linux__
                         _tprintf(_T("\t    %-30s filter: %-12s value: '%s'\n"), fieldName,
                             GetFilterName(ruleFilter->FilterType), ruleFilterData);
-#endif
 					} else {
 
-#if defined _WIN64 || defined _WIN32
-						_tprintf(_T("\t%-30s filter: %-12s value: '%s'\n"), fieldName,
-							GetFilterName(ruleFilter->FilterType), (LPTSTR)ruleFilter->Data);
-#elif defined __linux__
                         _tprintf(_T("\t%-30s filter: %-12s value: '%s'\n"), fieldName,
                             GetFilterName(ruleFilter->FilterType), ruleFilterData);
-#endif
 
 					}
 				}

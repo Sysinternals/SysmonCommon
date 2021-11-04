@@ -24,12 +24,17 @@
 #include "stdafx.h"
 #include "rules.h"
 #include "eventsCommon.h"
+#include "printfFormat.h"
 
 #if defined _WIN64 || defined _WIN32
 #include <Objbase.h>
 #include <WinEvt.h>
 #include <VersionHelper.h>
 #include "dll.h"
+#include "events.h"
+extern PFN_EVENT_WRITE  PfnEventWrite;
+BOOLEAN 				bPreVista = FALSE;
+
 #elif defined __linux__
 #include <pthread.h>
 #include "linuxHelpers.h"
@@ -39,6 +44,13 @@
 extern "C" {
 #include "outputxml.h"
 }
+
+extern "C" {
+VOID syslogHelper( int priority, const char* fmt, char* msg );
+}
+
+// define Linux as being 'pre-Vista' as it helps without event output
+BOOLEAN 				bPreVista = TRUE;
 #endif
 
 //
@@ -48,33 +60,103 @@ extern "C" {
 #define PATH_MAX_SIZE 31839
 #define MAX_EVENT_PACKET_SIZE 62000
 
-
-#if defined __linux__
-extern "C" {
-VOID syslogHelper( int priority, const char* fmt, char* msg );
-}
-
-#elif defined _WIN64 || defined _WIN32
-#include "events.h"
-extern PFN_EVENT_WRITE  		PfnEventWrite;
-#endif
-
 REGHANDLE 				g_Event = 0;
 HANDLE 					g_hEventSource = NULL;
-#if defined _WIN64 || defined _WIN32
-BOOLEAN 				bPreVista = FALSE;
-#elif defined __linux__
-// define Linux as being 'pre-Vista' as it helps without event output
-BOOLEAN 				bPreVista = TRUE;
-#endif
 BOOLEAN 				bInitialized = FALSE;
 ULONG					machineId = 0;
 
 //--------------------------------------------------------------------
 //
-// ProcessGetCache
+// Ulong64ToString
 //
-// Fetch a process cache entry
+// Write a Ulong64 as a string.
+//
+//--------------------------------------------------------------------
+BOOLEAN Ulong64ToString(
+    PTCHAR out,
+    DWORD size,
+    ULONG64 value
+    )
+{
+    if (out == NULL) {
+        return FALSE;
+    }
+    _stprintf_s( out, size, _T( "" PRINTF_ULONG64_FS ), value );
+    return TRUE;
+}
+
+//--------------------------------------------------------------------
+//
+// LogonIdToString
+//
+// Write a LogonId as a string.
+//
+//--------------------------------------------------------------------
+BOOLEAN LogonIdToString(
+    PTCHAR out,
+    DWORD size,
+    ULONG64 logonId
+    )
+{
+    if (out == NULL) {
+        return FALSE;
+    }
+#if defined _WIN64 || defined _WIN32
+    _stprintf_s( out, size, _T("0x%I64x"), logonId );
+#elif defined __linux__
+    // On Linux, the low part of the LUID is the Linux logon Id
+    _stprintf_s( out, size, "%ld", logonId & 0xffff );
+#endif
+    return TRUE;
+}
+
+//--------------------------------------------------------------------
+//
+// GenerateUniqueId
+//
+// Get a unique GUID for this event on this machine
+// Structure:
+//  - machineID (last part of the machine account SID)
+//  - Time of the event in seconds
+//  - TokenId (unique object ID) | type of the object
+//
+//--------------------------------------------------------------------
+GUID GenerateUniqueId(
+	_In_ PLARGE_INTEGER timestamp,
+	_In_ ULONGLONG ProcessStartKey,
+	OBJECT_TYPE type
+    )
+{
+	GUID result = {0,};
+	DWORD seconds = 0;
+	PBYTE pResult = (PBYTE)&result;
+
+	RtlTimeToSecondsSince1970( timestamp, &seconds );
+
+	*(DWORD*) pResult = machineId;
+	pResult += sizeof(DWORD);
+	*(DWORD*) pResult = seconds;
+	pResult += sizeof(DWORD);
+	*(DWORD64*) pResult = ProcessStartKey;
+	
+	return result;
+}
+
+//--------------------------------------------------------------------
+//
+// ProcessCache class implementation
+//
+// Static class that caches processes for faster lookup. Does not
+// require explicit initialisation. Has locking and unlocking
+// functions to guard access to it and the objects returned by it.
+//
+//--------------------------------------------------------------------
+
+//--------------------------------------------------------------------
+//
+// ProcessCache::ProcessGet
+//
+// Fetch a process cache entry.
 //
 //--------------------------------------------------------------------
 PPROCESS_CACHE_INFORMATION ProcessCache::ProcessGet(
@@ -160,7 +242,7 @@ PPROCESS_CACHE_INFORMATION ProcessCache::ProcessGet(
 //
 // ProcessCache::RemoveEntries
 //
-// Remove all entries from the cache
+// Remove all entries from the cache.
 //
 //--------------------------------------------------------------------
 void ProcessCache::RemoveEntries()
@@ -182,11 +264,13 @@ void ProcessCache::RemoveEntries()
 
 	UnlockCache();
 }
+
 //--------------------------------------------------------------------
 //
 // ProcessCache::ProcessRemove
 //
-// Remove an entry from the cache
+// Mark an entry as expired; calls PurgeExpired() to remove entries
+// that were marked as expired further back than the grace period.
 //
 //--------------------------------------------------------------------
 void ProcessCache::ProcessRemove(
@@ -229,6 +313,14 @@ void ProcessCache::ProcessRemove(
 	UnlockCache();
 }
 
+//--------------------------------------------------------------------
+//
+// ProcessCache::PurgeExpired
+//
+// Remove expired entries from the cache that are older than the grace
+// period.
+//
+//--------------------------------------------------------------------
 void ProcessCache::PurgeExpired( PLARGE_INTEGER EventTime )
 {
 	while( !_expiringProcesses.empty() && Expired( _expiringProcesses.top().time, EventTime->QuadPart ) ) {
@@ -251,7 +343,7 @@ void ProcessCache::PurgeExpired( PLARGE_INTEGER EventTime )
 //
 // ProcessCache::ProcessAdd
 //
-// Add a process record to the process cache
+// Add a process record to the process cache.
 //
 //--------------------------------------------------------------------
 void ProcessCache::ProcessAdd(
@@ -290,6 +382,13 @@ void ProcessCache::ProcessAdd(
 	}
 }
 
+//--------------------------------------------------------------------
+//
+// ProcessCache::Empty
+//
+// Reports if the process cache is empty or not.
+//
+//--------------------------------------------------------------------
 bool ProcessCache::Empty()
 {
 	LockCache();
@@ -299,6 +398,13 @@ bool ProcessCache::Empty()
 }
 
 #if defined _WIN64 || defined _WIN32
+//--------------------------------------------------------------------
+//
+// ProcessCache::DnsEntryAdd
+//
+// Adds a DNS entry to a process in the cache.
+//
+//--------------------------------------------------------------------
 bool ProcessCache::DnsEntryAdd( DWORD ProcessId, PDNS_QUERY_DATA DnsEntry )
 {
 	LockCache();
@@ -329,11 +435,6 @@ bool ProcessCache::DnsEntryAdd( DWORD ProcessId, PDNS_QUERY_DATA DnsEntry )
 	return true;
 }
 #endif
-
-//
-// Maximum killed processes in the cache
-//
-#define PROCESS_CACHE_FREE_MAX		    400
 
 #ifdef __cplusplus
 extern "C" {
@@ -366,43 +467,6 @@ VOID EventDataDescCreateS(
 	}
 
      EventDataDescCreate( Data, (PVOID)String, (ULONG)((_tcslen(String) + 1) * sizeof(TCHAR)) );
-}
-
-//--------------------------------------------------------------------
-//
-// GenerateUniqueId
-//
-// Get a unique GUID for this event on this machine
-// Structure:
-//  - machineID (last part of the machine account SID)
-//  - Time of the event in seconds
-//  - TokenId (unique object ID) | type of the object
-//
-//--------------------------------------------------------------------
-GUID GenerateUniqueId(
-	_In_ PLARGE_INTEGER timestamp,
-	_In_ ULONGLONG ProcessStartKey,
-	OBJECT_TYPE type
-    )
-{
-	GUID result = {0,};
-	DWORD seconds = 0;
-	PBYTE pResult = (PBYTE)&result;
-
-#if defined _WIN64 || defined _WIN32
-	RtlTimeToSecondsSince1970( timestamp, &seconds );
-#elif defined __linux__
-    // timestamp in 100ns intervals since epoch
-    seconds = LargeTimeToSeconds( timestamp );
-#endif
-
-	*(DWORD*) pResult = machineId;
-	pResult += sizeof(DWORD);
-	*(DWORD*) pResult = seconds;
-	pResult += sizeof(DWORD);
-	*(DWORD64*) pResult = ProcessStartKey;
-	
-	return result;
 }
 
 //--------------------------------------------------------------------
@@ -627,7 +691,10 @@ VOID TimestampFormat(
 #elif defined __linux__
     // time in 100ns intervals since epoch
     struct tm timeFields;
-    time_t fileTime = LargeTimeToSeconds( timestamp );
+    time_t fileTime = 0;
+    DWORD seconds = 0;
+    RtlTimeToSecondsSince1970( timestamp, &seconds );
+    fileTime = seconds;
 
     if ( gmtime_r(&fileTime, &timeFields) ) {
 
@@ -759,11 +826,7 @@ PWCHAR ExtGetAnsiString(
 
 		return NULL;
 	}
-#if defined _WIN64 || defined _WIN32
 	*size = MultiByteToWideChar( CP_ACP, MB_PRECOMPOSED, (LPCSTR) ptr, origSize, NULL, 0 );
-#elif defined __linux__
-    *size = UTF8toUTF16( NULL, (LPCSTR) ptr, 0 );
-#endif
 	if( *size == 0 ) {
 
 		return NULL;
@@ -774,11 +837,7 @@ PWCHAR ExtGetAnsiString(
 
 	if( str != NULL ) {
 
-#if defined _WIN64 || defined _WIN32
 		MultiByteToWideChar( CP_ACP, MB_PRECOMPOSED, (LPCSTR)ptr, origSize, str, *size );
-#elif defined __linux__
-        UTF8toUTF16( str, (LPCSTR)ptr, *size );
-#endif
 	}
 	return str;
 }
@@ -977,11 +1036,7 @@ PTCHAR ExtTranslateNtPath(
 		return NULL;
 	}
 
-#if defined _WIN64 || defined _WIN32
 	return TranslateNtPath( ptr, size );
-#elif defined __linux__
-    return DupStringWithoutNullChar( ptr, size );
-#endif
 }
 
 //--------------------------------------------------------------------
@@ -1347,6 +1402,7 @@ EventSetFieldExt(
         }
     }
 #endif
+
 	else if( Type == N_AnsiOrUnicodeString ) {
 		ptr = ExtGetString( extensionsSizes, extensions, index );
 		if( ptr != NULL ) {
@@ -1368,21 +1424,14 @@ EventSetFieldExt(
 					break;
 				}
 			}
+#endif
 
-			// clean out carriage returns
-			for( ULONG i = 0; i < size/sizeof(WCHAR); i++ ) {
-
-				if( ((PWCHAR)ptr)[i] == 0xA || ((PWCHAR)ptr)[i] == 0xD )
-					((PWCHAR)ptr)[i] = ' ';
-			}
-#elif defined __linux__
 			// clean out carriage returns
 			for( ULONG i = 0; i < size/sizeof(TCHAR); i++ ) {
 
 				if( ((PTCHAR)ptr)[i] == 0xA || ((PTCHAR)ptr)[i] == 0xD )
 					((PTCHAR)ptr)[i] = ' ';
 			}
-#endif
 
 			Type = N_UnicodeString;
 		}
@@ -1413,7 +1462,6 @@ EventSetFieldExt(
 	}
 	else if( Type == N_RegistryPath ) {
 
-		//ptr = ExtTranslateRegistryPath( extensionsSizes, extensions, index );
 		ptr = ExtTranslateNtPath( extensionsSizes, extensions, index );
 
 		if( ptr != NULL ) {
@@ -1677,15 +1725,10 @@ EventResolveField(
 	case N_RegistryPath:
 		EventSetFieldS( EventBuffer, FieldIndex, TranslateRegistryPath( ptr, size ), TRUE );
 		break;
+#endif
 	case N_UnicodePath:
 		EventSetFieldS( EventBuffer, FieldIndex, TranslateNtPath( ptr, size ), TRUE );
 		break;
-#elif defined __linux__
-// don't translate path on Linux
-	case N_UnicodePath:
-		EventSetFieldS( EventBuffer, FieldIndex, DupStringWithoutNullChar( (PTCHAR)ptr, size ), TRUE );
-		break;
-#endif
 
 	case N_Ulong:
 		if( inType == I_UInt16 ) {
@@ -2016,32 +2059,19 @@ EventResolveField(
 				break;
 
 			case N_Ulong64:
-#if defined _WIN64 || defined _WIN32
-				_stprintf_s( tmpStringBuffer, _countof(tmpStringBuffer), _T("%I64u"), *(ULONG64*) ptr );
-#elif defined __linux__
-				_stprintf_s( tmpStringBuffer, _countof(tmpStringBuffer), _T("%" PRIu64), *(ULONG64*) ptr );
-#endif
+                Ulong64ToString( tmpStringBuffer, _countof(tmpStringBuffer), *(ULONG64*) ptr );
 				EventDataDescCreateS( &Output[FieldIndex], _tcsdup( tmpStringBuffer ) );
 				EventDataMarkAllocated( &Output[FieldIndex] );
 				break;
 
 			case N_LogonId:
-#if defined _WIN64 || defined _WIN32
-				_stprintf_s( tmpStringBuffer, _countof(tmpStringBuffer), _T("0x%I64x"), *(ULONG64*) ptr );
-#elif defined __linux__
-                // On Linux, the low part of the LUID is the Linux logon Id
-				_stprintf_s( tmpStringBuffer, _countof(tmpStringBuffer), _T("%ld"), (*(ULONG64*) ptr) & 0xffff );
-#endif
+                LogonIdToString( tmpStringBuffer, _countof(tmpStringBuffer), *(ULONG64*) ptr );
 				EventDataDescCreateS( &Output[FieldIndex], _tcsdup( tmpStringBuffer ) );
 				EventDataMarkAllocated( &Output[FieldIndex] );
 				break;
 
 			case N_GUID:
-#if defined _WIN64 || defined _WIN32
 				StringFromGUID2( *(const GUID *)ptr, (LPOLESTR) tmpStringBuffer, _countof(tmpStringBuffer) );
-#elif defined __linux__
-				StringFromGUID2( *(const GUID *)ptr, tmpStringBuffer, _countof(tmpStringBuffer) );
-#endif
 				EventDataDescCreateS( &Output[FieldIndex], _tcsdup( tmpStringBuffer ) );
 				EventDataMarkAllocated( &Output[FieldIndex] );
 				break;
@@ -2872,10 +2902,10 @@ DWORD DispatchEvent(
 			EventFieldFree( &SYSMONEVENT_FILE_DELETE_Type, eventBuffer );
 
 		} else {
-#endif
 			EventProcess( eventType, eventBuffer, eventHeader, (PSID)ExtGetPtrX( fileDelete, FD_Sid, NULL ) );
-#if defined _WIN64 || defined _WIN32
 		}
+#elif defined __linux__
+        EventProcess( eventType, eventBuffer, eventHeader, (PSID)ExtGetPtrX( fileDelete, FD_Sid, NULL ) );
 #endif
 		break;
 

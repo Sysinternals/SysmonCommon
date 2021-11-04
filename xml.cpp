@@ -480,6 +480,46 @@ public:
 
 //--------------------------------------------------------------------
 //
+// OpenXmlFile
+//
+// Open the XML File
+//
+//--------------------------------------------------------------------
+FILE *
+OpenXmlFile(
+    PCTCH FileName
+    )
+{
+    FILE*           stream = NULL;
+
+    if (NULL == FileName)
+        return NULL;
+
+#if defined _WIN64 || defined _WIN32
+	TCHAR			Buffer[2048];
+	errno_t			err;
+	err = _tfopen_s(&stream, FileName, _T("r, ccs=UTF-16LE"));
+
+	if (err != 0) {
+
+		SetLastError(err);
+		_tprintf(_T("Error: Failed to open configuration file %s: %s\n"), FileName,
+			GetLastErrorText(Buffer, _countof(Buffer)));
+		stream = NULL;
+	}
+
+#elif defined __linux__
+	stream = fopen(FileName, "rb");
+	if (stream == NULL) {
+		printf("Error: Failed to open configuration file %s\n", FileName);
+	}
+#endif
+
+    return stream;
+}
+
+//--------------------------------------------------------------------
+//
 // GetFileContentWithDtd
 //
 // Fetch the content of the configuration file and add dtd info
@@ -498,43 +538,22 @@ GetFileContentWithDtd(
 	FILE* 			stream;
 #if defined _WIN64 || defined _WIN32
 	std::wstring 	ret;
+	const TCHAR		xmlTag[] = _T("<?xml");
+	const TCHAR		endTag[] = _T("?>");
 #elif defined __linux__
 	std::string 	ret;
+	WCHAR			xmlTag[] = {'<', '?', 'x', 'm', 'l', 0};
+	WCHAR			endTag[] = {'?', '>', 0};
 #endif
 	TCHAR			Buffer[2048];
 	PTCHAR			dtdContent, startPos, endPos;
 	BOOLEAN			firstRead = TRUE;
-#if defined _WIN64 || defined _WIN32
-	const TCHAR		xmlTag[] = _T("<?xml");
-	const TCHAR		endTag[] = _T("?>");
-#elif defined __linux__
-	WCHAR			xmlTag[] = {'<', '?', 'x', 'm', 'l', 0};
-	WCHAR			endTag[] = {'?', '>', 0};
-#endif
 	size_t			numRead = 0;
 
-	if (NULL == FileName) {
-		return ret;
-	}
-#if defined _WIN64 || defined _WIN32
-	errno_t			err;
-	err = _tfopen_s(&stream, FileName, _T("r, ccs=UTF-16LE"));
-
-	if (err != 0) {
-
-		SetLastError(err);
-		_tprintf(_T("Error: Failed to open configuration file %s: %s\n"), FileName,
-			GetLastErrorText(Buffer, _countof(Buffer)));
-		return ret;
-	}
-
-#elif defined __linux__
-	stream = fopen(FileName, "rb");
-	if (stream == NULL) {
-		printf("Error: Failed to open configuration file %s\n", FileName);
-		return ret;
-	}
-#endif
+    stream = OpenXmlFile( FileName );
+    if( NULL == stream ) {
+        return ret;
+    }
 
 	//
 	// Add the dtd rule to identify bad configuration
@@ -549,7 +568,6 @@ GetFileContentWithDtd(
 
 #if defined _WIN64 || defined _WIN32
 	std::wstring dtdAndConfig( dtdContent );
-	while( (numRead = fread( Buffer, 1, _countof( Buffer ), stream ) / 2) > 0 ) {
 #elif defined __linux__
 	unsigned int len = _tcslen( dtdContent );
 
@@ -568,9 +586,12 @@ GetFileContentWithDtd(
 	}
 
 	memcpy( &dtdAndConfig[0], &tmp[0], len * sizeof( WCHAR ) );
-
-	while( (numRead = fread( Buffer, 1, sizeof( Buffer ), stream )) > 0 ) {
 #endif
+
+    // _countof() macro states number of entries (sizeof(X) / sizeof(*X))
+    // fread() reports number of bytes read. Divide this by the character size for number
+    // of characters.
+	while( (numRead = fread( Buffer, 1, _countof( Buffer ), stream ) / sizeof( TCHAR ) ) > 0 ) {
 
 		//
 		// Discard <?xml tag if it was added in the front.
@@ -831,11 +852,7 @@ FetchConfigurationVersion(
 	// read file with detected file encoding if there was no BOM
 	//
 
-#if defined _WIN64 || defined _WIN32
 	doc = xmlReadFile( fileName, fileEncoding, 0 );
-#elif defined __linux__
-	doc = xmlReadFile( FileName, fileEncoding, 0 );
-#endif
 	if( !doc ) {
 
 		_tprintf( _T( "Error: Failed to load xml configuration: %s (could not read file)\n" ),
@@ -1038,6 +1055,128 @@ void XMLCDECL libxml2Error( void* ctx, const char* format, ... )
 
 //--------------------------------------------------------------------
 //
+// CreateEventFilteringQuery
+//
+// Create an XPATH string for querying events
+//
+//--------------------------------------------------------------------
+BOOLEAN
+CreateEventFilteringQuery(
+    PCHAR Out,
+    size_t Len,
+    PTCHAR EventName
+    )
+{
+	char xmlEventFilteringQuery[] = "/Sysmon/EventFiltering//%s";
+
+    if( Out != NULL ) {
+        *Out = 0x00;
+    }
+
+    if( Out == NULL || EventName == NULL ) {
+        return FALSE;
+    }
+
+#if defined _WIN64 || defined _WIN32
+	char eventNameChar[256];
+    size_t convertedChars = WideCharToMultiByte( CP_UTF8, WC_ERR_INVALID_CHARS, EventName, -1, eventNameChar, sizeof( eventNameChar ), NULL, NULL );
+    if (convertedChars == 0 ) {
+        _tprintf( _T( "Failed to convert rule name: '%s'\n" ), EventName );
+        return FALSE;
+    }
+    eventNameChar[sizeof(eventNameChar)-1] = 0x00;
+
+    snprintf( Out, Len, xmlEventFilteringQuery, eventNameChar );
+#elif defined __linux__
+    snprintf( Out, Len, xmlEventFilteringQuery, EventName );
+#endif
+    return TRUE;
+}
+
+//--------------------------------------------------------------------
+//
+// CopyToWideField
+//
+// Copies a field to a wide field. On Windows, the source field will
+// already be wide, but on Linux it will be UTF8.
+//--------------------------------------------------------------------
+BOOLEAN
+CopyToWideField(
+    PUCHAR Out,
+    PTCHAR In,
+    size_t Len
+    )
+{
+    if( Out != NULL ) {
+        *Out = 0x00;
+    }
+
+    if( Out == NULL || In == NULL ) {
+        return FALSE;
+    }
+
+#if defined _WIN64 || defined _WIN32
+    memcpy( Out, In, Len );
+#elif defined __linux__
+    UTF8toUTF16( (PWCHAR)Out, In, Len / sizeof( WCHAR ) );
+#endif
+    return TRUE;
+}
+
+//--------------------------------------------------------------------
+//
+// fPrintRuleCombine
+//
+// Print rule combine information to stream
+//
+//--------------------------------------------------------------------
+VOID
+fPrintRuleCombine(
+    FILE* OutFile,
+    PCTSTR Format,
+    PWCHAR RuleName,
+    PCTSTR RuleCombine
+    )
+{
+#if defined _WIN64 || defined _WIN32
+    _ftprintf_s( OutFile, Format, RuleName, RuleCombine );
+#elif defined __linux__
+    int aggNameSize = sizeof(RuleName) / sizeof(RuleName);
+    CHAR aggName[aggNameSize];
+    UTF16toUTF8(aggName, RuleName, aggNameSize);
+    _ftprintf_s( OutFile, Format, aggName, RuleCombine );
+#endif
+}
+
+//--------------------------------------------------------------------
+//
+// fPrintFilterValue
+//
+// Print field, filter type and value
+//
+//--------------------------------------------------------------------
+VOID
+fPrintFilterValue(
+    FILE* OutFile,
+    PCTSTR Format,
+    PTCHAR FieldName,
+    PTCHAR FilterType,
+    PTCHAR DataUTF16,
+    PCHAR DataUTF8
+    )
+{
+#if defined _WIN64 || defined _WIN32
+    _ftprintf_s( OutFile, Format, FieldName, FilterType, DataUTF16 );
+#elif defined __linux__
+    _ftprintf_s( OutFile, Format, FieldName, FilterType, DataUTF8 );
+#endif
+}
+
+
+
+
+//--------------------------------------------------------------------
+//
 // ApplyConfigurationFile
 //
 // Main entry point
@@ -1059,6 +1198,7 @@ ApplyConfigurationFile(
 	ADD_RULES						addRules[10] = {0,};
 	ULONG							aggregationId = 0;
 #if defined _WIN64 || defined _WIN32
+	size_t							convertedChars = 0;
 	char							fileName[MAX_PATH];
 #elif defined __linux__
 	const char*						fileName = FileName;
@@ -1069,13 +1209,8 @@ ApplyConfigurationFile(
 	xmlXPathObjectPtr				xpathObj = NULL;
 	xmlNode*						curNode = NULL;
 	xmlChar							xmlSysmonQuery[] = "/Sysmon[1]";
-	xmlChar							xmlEventFilteringQuery[] = "/Sysmon/EventFiltering//%s";
 	SIZE_T							index;
 	xmlChar							xmlEventQuery[256];
-#if defined _WIN64 || defined _WIN32
-	char							ruleNameChar[256];
-	size_t							convertedChars = 0;
-#endif
 	char*							xmlEncoding = NULL;
 	BOOLEAN							is16bit = false;
 	BOOLEAN							hasBOM = false;
@@ -1369,21 +1504,10 @@ ApplyConfigurationFile(
 				// Force the for loop to jump over the series of duplicates.
 				index = indexLastOfSeries - 1;
 
-#if defined _WIN64 || defined _WIN32
-				convertedChars = WideCharToMultiByte( CP_UTF8, WC_ERR_INVALID_CHARS, rule->RuleName, -1, ruleNameChar, sizeof( ruleNameChar ), NULL, NULL );
-				if (convertedChars == 0 ) {
-					_tprintf( _T( "Failed to convert rule name: '%s'\n" ), rule->RuleName );
-					continue;
-				}
-				ruleNameChar[sizeof(ruleNameChar)-1] = 0x00;
+                if( !CreateEventFilteringQuery( (char*)xmlEventQuery, sizeof( xmlEventQuery ), rule->RuleName ) ) {
+                    continue;
+                }
 
-				//
-				// Find event node
-				//
-				snprintf( (char*)xmlEventQuery, sizeof( xmlEventQuery ), (char*)xmlEventFilteringQuery, ruleNameChar );
-#elif defined __linux__
-				snprintf( (char*)xmlEventQuery, sizeof( xmlEventQuery ), (char*)xmlEventFilteringQuery, rule->RuleName );
-#endif
 				if ( xpathObj ) {
 					xmlXPathFreeObject ( xpathObj );
 				}
@@ -1559,11 +1683,7 @@ ApplyConfigurationFile(
 								ruleFilter->FieldId = addMatch->fieldId;
 								ruleFilter->FilterType = addMatch->filterOption;
 								ruleFilter->DataSize = dataSize;
-#if defined _WIN64 || defined _WIN32
-								memcpy( ruleFilter->Data, pos, dataSize );
-#elif defined __linux__
-								UTF8toUTF16( (PWCHAR)ruleFilter->Data, pos, dataSize / sizeof( WCHAR ) );
-#endif
+                                CopyToWideField( ruleFilter->Data, pos, dataSize );
 
 								hr = ruleBuilder.AddFilterEntry( ruleFilter );
 								free( ruleFilter );
@@ -1635,13 +1755,9 @@ ApplyConfigurationFile(
 									if( ruleName ) {
 										// Replace rulegroup for aggregate name.
 										curRuleName = ruleName;
-#if defined _WIN64 || defined _WIN32
 										MultiByteToWideChar( CP_UTF8, 0, (char*)ruleName, -1,
 												aggregation.name, _countof( aggregation.name ) );
 										aggregation.name[_countof( aggregation.name )-1] = 0x00;
-#elif defined __linux__
-										UTF8toUTF16( aggregation.name, (PCHAR)ruleName, _countof( aggregation.name ) );
-#endif
 									}
 
 									ruleBuilder.AddAggregationEntry( &aggregation );
@@ -1762,11 +1878,7 @@ ApplyConfigurationFile(
 											xmlFree( ruleNameP );
 										}
 
-#if defined _WIN64 || defined _WIN32
-										memcpy( ruleFilter->Data, (BSTR)subValue, dataSize - sizeof( WCHAR ) );
-#elif defined __linux__
 										memcpy( ruleFilter->Data, subValue, dataSize - sizeof( WCHAR ) );
-#endif
 
 										hr = ruleBuilder.AddFilterEntry( ruleFilter );
 										free( ruleFilter );
@@ -1881,11 +1993,7 @@ ApplyConfigurationFile(
 				ruleFilter->FieldId = addRules[i].fieldId;
 				ruleFilter->FilterType = addRules[i].filterOption;
 				ruleFilter->DataSize = dataSize;
-#if defined _WIN64 || defined _WIN32
-				memcpy( ruleFilter->Data, pos, dataSize );
-#elif defined __linux__
-				UTF8toUTF16( (PWCHAR)(ruleFilter->Data), pos, dataSize / sizeof( WCHAR ) );
-#endif
+                CopyToWideField( ruleFilter->Data, pos, dataSize );
 
 				hr = ruleBuilder.AddFilterEntry( ruleFilter );
 				D_ASSERT( SUCCEEDED( hr ) );
@@ -2026,10 +2134,11 @@ ApplyConfigurationFile(
 					}
 
 #if defined __linux__
-
 					int ruleFilterDataSize = WideStrlen((PWCHAR)(ruleFilter->Data)) + 1;
 					CHAR ruleFilterData[ruleFilterDataSize * 4];
 					UTF16toUTF8(ruleFilterData, (PWCHAR)(ruleFilter->Data), ruleFilterDataSize * 4);
+#elif defined _WIN64 || defined _WIN32
+                    CHAR *ruleFilterData = NULL;
 #endif
 					if( ruleFilter->AggregationId ) {
 
@@ -2038,45 +2147,22 @@ ApplyConfigurationFile(
 							PRULE_CONTEXT pContext = &ruleContext;
 							PRULE_AGGREGATION pAggregation = AGGREGATION_FROM_OFFSET( pContext, ruleFilter->AggregationOffset );
 
-#if defined _WIN64 || defined _WIN32
-							if( wcslen( pAggregation->name ) )
-								_ftprintf_s( dumpF, _T( "\tCompound Rule %.32s   combine using %s\n" ), pAggregation->name,
-									RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
-							else
+                            if( pAggregation->name[0] != 0x00 )
+                                fPrintRuleCombine( dumpF, _T( "\tCompound Rule %.32s   combine using %s\n" ), pAggregation->name,
+                                        RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
+                            else
 								_ftprintf_s( dumpF, _T( "\tCompound Rule %04d   combine using %s\n" ), ruleFilter->AggregationId,
-									RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
-
-#elif defined __linux__
-							int aggNameSize = sizeof(pAggregation->name) / sizeof(pAggregation->name[0]);
-							CHAR aggName[aggNameSize];
-							UTF16toUTF8(aggName, pAggregation->name, aggNameSize);
-							if( WideStrlen( pAggregation->name ) )
-								_ftprintf_s( dumpF, _T( "\tCompound Rule %.32s   combine using %s\n" ), aggName,
-									RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
-							else
-								_ftprintf_s( dumpF, _T( "\tCompound Rule %04d   combine using %s\n" ), ruleFilter->AggregationId,
-									RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
-#endif
+                                        RuleCombineOR == pAggregation->combineType ? _T( "Or" ) : RuleCombineAND == pAggregation->combineType ? _T( "And" ) : _T( "Unknown" ) );
 
 							currentAggregation = ruleFilter->AggregationId;
 						}
 
-#if defined _WIN64 || defined _WIN32
-						_ftprintf( dumpF, _T( "\t    %-30s filter: %-12s value: '%s'\n" ), fieldName,
-							GetFilterName( ruleFilter->FilterType ), (LPTSTR)ruleFilter->Data );
-#elif defined __linux__
-						_ftprintf( dumpF, _T( "\t    %-30s filter: %-12s value: '%s'\n" ), fieldName,
-							GetFilterName( ruleFilter->FilterType ), ruleFilterData );
-#endif
+						fPrintFilterValue( dumpF, _T( "\t    %-30s filter: %-12s value: '%s'\n" ), fieldName,
+                                GetFilterName( ruleFilter->FilterType ), (LPTSTR)ruleFilter->Data, ruleFilterData );
 					} else {
 
-#if defined _WIN64 || defined _WIN32
-						_ftprintf( dumpF, _T( "\t%-30s filter: %-12s value: '%s'\n" ), fieldName,
-							GetFilterName( ruleFilter->FilterType ), (LPTSTR)ruleFilter->Data );
-#elif defined __linux__
-						_ftprintf( dumpF, _T( "\t%-30s filter: %-12s value: '%s'\n" ), fieldName,
-							GetFilterName( ruleFilter->FilterType ), ruleFilterData );
-#endif
+						fPrintFilterValue( dumpF, _T( "\t%-30s filter: %-12s value: '%s'\n" ), fieldName,
+							GetFilterName( ruleFilter->FilterType ), (LPTSTR)ruleFilter->Data, ruleFilterData );
 					}
 				}
 			}

@@ -47,6 +47,7 @@ int min(int a, int b) { return (a < b ? a : b); }
 #define SOCKADDR struct sockaddr
 #endif
 
+#include "printfFormat.h"
 #include "networkCommon.h"
 
 #define MAX_THREADS 	50
@@ -967,11 +968,7 @@ CString	IPAddressToHostName( const BYTE * addr, bool isV6, WORD port, bool isTCP
 CString IntToString( LONGLONG value )
 {
 	TCHAR text[ 30 ];
-#if defined _WIN64 || defined _WIN32
-	_stprintf_s( text, _countof( text ),_T("%I64d"), value );
-#elif defined __linux__
-	_stprintf_s( text, _countof( text ),_T("%" PRId64), value );
-#endif
+	_stprintf_s( text, _countof( text ),_T( "" PRINTF_LONGLONG_FS ), value );
 	return text;
 }
 

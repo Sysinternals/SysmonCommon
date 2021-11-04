@@ -27,6 +27,7 @@
 #include <libxml/parser.h>
 #include <sys/types.h>
 #include <string.h>
+#include "printfFormat.h"
 
 #if defined __linux__
 #include <sys/ioctl.h>
@@ -646,6 +647,35 @@ OPTION_VALIDATE optionValidation[] = {
 
 //--------------------------------------------------------------------
 //
+// IsSwitch
+//
+// Checks if a character is a switch identifier or not.
+//
+//--------------------------------------------------------------------
+BOOLEAN
+IsSwitch(
+    TCHAR c
+    )
+{
+    BOOLEAN ret = FALSE;
+
+#if defined _WIN64 || defined _WIN32
+    if( c == _T('/') || c == _T('-') ) {
+        ret = TRUE;
+    }
+
+#elif defined __linux__
+    if( c == '-' ) {
+        ret = TRUE;
+    }
+#endif
+
+    return ret;
+}
+
+
+//--------------------------------------------------------------------
+//
 // ParseCommandLine
 //
 // Automatically parse the command-line from pre-generated data from
@@ -671,13 +701,13 @@ ParseCommandLine(
 	TCHAR        dumpFile[MAX_PATH];
 	FILE*        dumpF = NULL;
 	PVOID        ruleCheck = NULL;
+	size_t       num_written, num_read;
+	PTCHAR       internalRepresentation = NULL;
 #if defined _WIN64 || defined _WIN32
 	struct _stat dumpStat;
 #elif defined __linux__
     struct stat  dumpStat;
 #endif
-	size_t       num_written, num_read;
-	PTCHAR       internalRepresentation = NULL;
 #endif
 
 	//
@@ -687,12 +717,7 @@ ParseCommandLine(
 	for( i = 1; i < argc; i++ ) {
 
 		// Is not a switch
-#if defined _WIN64 || defined _WIN32
-		if( argv[i][0] != _T('/') &&
-			argv[i][0] != _T('-') ) {
-#elif defined __linux__
-		if( argv[i][0] != _T('-') ) {
-#endif
+        if( !IsSwitch( argv[i][0] ) ) {
 
 			return FALSE;
 		}
@@ -779,13 +804,7 @@ ParseCommandLine(
 					//
 					if( opt ) {
 
-#if defined _WIN64 || defined _WIN32
-						if( argv[i + 1][0] == _T('-') ||
-							argv[i + 1][0] == _T('/') ) {
-#elif defined __linux__
-						if( argv[i + 1][0] == _T('-') ) {
-#endif
-
+                        if( IsSwitch( argv[i + 1][0] ) ) {
 
 							break;
 						}
@@ -868,11 +887,7 @@ ParseCommandLine(
 			// In both cases, exit after taking action, and exit on error.
 			if (OPT_SET(InternalRepresentation)) {
 				internalRepresentation = OPT_VALUE(InternalRepresentation);
-#if defined _WIN64 || defined _WIN32
-				printf("Dump/Check Internal Representation\nRulesSize = %ld\n", *RulesSize);
-#elif defined __linux__
-				printf("Dump/Check Internal Representation\nRulesSize = %d\n", *RulesSize);
-#endif
+				printf("Dump/Check Internal Representation\nRulesSize = " PRINTF_ULONG_FS "\n", *RulesSize);
 				if (!internalRepresentation || !*internalRepresentation) {
 					printf("Internal Representation file name missing\n");
 					exit(-1);
@@ -882,11 +897,7 @@ ParseCommandLine(
 					// Check
 					_tprintf(_T("Checking with: '%s'\n"), dumpFile);
 					if ((unsigned long)dumpStat.st_size != *RulesSize) {
-#if defined _WIN64 || defined _WIN32
-						_tprintf(_T("File size = %d, but expected = %ld\n"), dumpStat.st_size, *RulesSize);
-#elif defined __linux__
-						_tprintf(_T("File size = %ld, but expected = %d\n"), dumpStat.st_size, *RulesSize);
-#endif
+						_tprintf(_T("File size = " PRINTF_LONGLONG_FS ", but expected = " PRINTF_ULONG_FS "\n"), (LONGLONG)dumpStat.st_size, *RulesSize);
 						exit(-2);
 					}
 					dumpF = _tfopen(dumpFile, _T("rb"));
@@ -901,7 +912,7 @@ ParseCommandLine(
 						exit(-1);
 					}
 					num_read = fread(ruleCheck, 1, *RulesSize, dumpF);
-					printf("Read %zd bytes\n", num_read);
+					printf("Read " PRINTF_ULONGLONG_FS " bytes\n", (ULONGLONG)num_read);
 					fclose(dumpF);
 					if (memcmp(*Rules, ruleCheck, *RulesSize)) {
 						printf("File contents DOES NOT match internal representation\n");
@@ -921,7 +932,7 @@ ParseCommandLine(
 						exit(-1);
 					}
 					num_written = fwrite(*Rules, 1, *RulesSize, dumpF);
-					printf("Written %zd bytes\n", num_written);
+					printf("Written " PRINTF_ULONGLONG_FS " bytes\n", (ULONGLONG)num_written);
 					fclose(dumpF);
 					exit(0);
 				}
