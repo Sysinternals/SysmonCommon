@@ -510,7 +510,7 @@ void GenerateUniqueSGUID(
 	)
 {
 	GUID							g;
-	LARGE_INTEGER					timestamp = {0,};
+	LARGE_INTEGER					timestamp = {{0}};
 #if defined _WIN64 || defined _WIN32
 	NTSTATUS						status;
 	PSECURITY_LOGON_SESSION_DATA 	sessionData;
@@ -2114,7 +2114,7 @@ ProcessEventRulesDry(
 	)
 {
 	ULONG index;
-	EVENT_DATA_DESCRIPTOR output[SYSMON_MAX_EVENT_Fields] = {0,};
+	EVENT_DATA_DESCRIPTOR output[SYSMON_MAX_EVENT_Fields] = {{0}};
 	RuleDefaultType ret;
 
 	ret = ProcessEventRules( EventTime, EventType, EventBuffer, EventData, output, RuleName, NULL );
@@ -2172,12 +2172,12 @@ EventProcess(
 	RuleDefaultType				ruleDefault;
 	DWORD					error = ERROR_SUCCESS;
 	InTypes					outputType;
-	EVENT_DATA_DESCRIPTOR 	Output[SYSMON_MAX_EVENT_Fields] = {0,};
+	EVENT_DATA_DESCRIPTOR 	Output[SYSMON_MAX_EVENT_Fields] = {{0}};
     LARGE_INTEGER			currentTime;
 	PLARGE_INTEGER			eventTime = NULL;
 	PWCHAR					ruleName = NULL;
 #if defined _WIN64 || defined _WIN32
-	PTCHAR					OutStr[SYSMON_MAX_EVENT_Fields] = {0,};
+	PTCHAR					OutStr[SYSMON_MAX_EVENT_Fields] = {{0}};
 #elif defined __linux__
     size_t                  eventMax = 65536;
     char                    event[eventMax];
@@ -2666,7 +2666,7 @@ DWORD DispatchEvent(
 	PTCHAR							companyName, fileVersion, productName, fileDescription, originalFileName;
 	PTCHAR							id = NULL, message = NULL;
 	GUID							guid;
-	SYSMON_DATA_DESCRIPTOR			eventBuffer[SYSMON_MAX_EVENT_Fields] = {(NativeTypes) 0};
+	SYSMON_DATA_DESCRIPTOR			eventBuffer[SYSMON_MAX_EVENT_Fields] = {{(NativeTypes) 0}};
 	PSYSMON_PROCESS_ACCESS			processAccess;
 	PSYSMON_EVENT_TYPE_FMT			eventType;
 	PSYSMON_FILE_DELETE				fileDelete;
@@ -3244,7 +3244,7 @@ DWORD NetworkEvent(
 	_In_ const TCHAR* dstPortname
 )
 {
-	SYSMON_DATA_DESCRIPTOR		eventBuffer[SYSMON_MAX_EVENT_Fields] = {(NativeTypes) 0};
+	SYSMON_DATA_DESCRIPTOR		eventBuffer[SYSMON_MAX_EVENT_Fields] = {{(NativeTypes) 0}};
 
 	EventSetFieldX( eventBuffer, F_NC_UtcTime, N_LargeTime, *Time );
 	EventSetFieldX( eventBuffer, F_NC_ProcessGuid, N_ProcessId, OwnerPID );
@@ -3281,7 +3281,7 @@ DWORD SendStateEvent(
     _In_ PTCHAR FileVersion
     )
 {
-	SYSMON_DATA_DESCRIPTOR	eventBuffer[SYSMON_MAX_EVENT_Fields] = {(NativeTypes) 0};
+	SYSMON_DATA_DESCRIPTOR	eventBuffer[SYSMON_MAX_EVENT_Fields] = {{(NativeTypes) 0}};
 	TCHAR		schemaVersion[64];
 
 	_stprintf_s( schemaVersion, _countof(schemaVersion), _T("%.2f"), TO_DOUBLE( ConfigurationVersion ) );
@@ -3305,7 +3305,7 @@ DWORD SendConfigEvent(
 	_In_ PTCHAR ConfigHash
 	)
 {
-	SYSMON_DATA_DESCRIPTOR	eventBuffer[SYSMON_MAX_EVENT_Fields] = { (NativeTypes) 0 };
+	SYSMON_DATA_DESCRIPTOR	eventBuffer[SYSMON_MAX_EVENT_Fields] = {{(NativeTypes) 0}};
 
 	EventSetFieldS( eventBuffer, F_SCC_Configuration, ConfigPath, FALSE );
 	EventSetFieldS( eventBuffer, F_SCC_ConfigurationFileHash, ConfigHash ? ConfigHash : _T(""), FALSE );
