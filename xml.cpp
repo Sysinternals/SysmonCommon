@@ -353,7 +353,7 @@ public:
 
 	HRESULT UndoEventAdd()
 	{
-		if( lastEventOffset == 0 || prevLastEventOffset == ULONG_MAX ) {
+		if( lastEventOffset == 0 || (unsigned long)prevLastEventOffset == ULONG_MAX ) {
 
 			// Can't undo more than the very last event (no undo history).
 			return E_OUTOFMEMORY;
