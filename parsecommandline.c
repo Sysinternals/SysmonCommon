@@ -43,6 +43,7 @@ SysmonCryptoCurrent(
 }
 #endif
 
+#define NO_MAX_LENGTH (-1)
 int g_VariableFieldSizes[SYSMON_MAX_EVENT_ID][SYSMON_MAX_EVENT_Fields];
 
 //--------------------------------------------------------------------
@@ -64,9 +65,9 @@ BOOLEAN LoadVariableFieldSizes(PCTSTR constFieldSizeStr)
     size_t strLen = 0;
 
     //
-    // Inititalise all entries to -1 to indicate no max size set
+    // Inititalise all entries to -1 (NO_MAX_LENGTH) to indicate no max size set
     //
-    memset( g_VariableFieldSizes, -1, sizeof( g_VariableFieldSizes ) );
+    memset( g_VariableFieldSizes, NO_MAX_LENGTH, sizeof( g_VariableFieldSizes ) );
 
     //
     // If no FieldSizes entry, nothing to do
