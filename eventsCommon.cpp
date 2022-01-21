@@ -3061,6 +3061,7 @@ DWORD DispatchEvent(
 					//
 					if( imageLoad->m_Signed == NULL ) {
 
+						// Cleanup for duplicate, imageLoad->m_HashBuffer, etc is in HandleSignatureEntry()
 						break;
 					}
 				}
@@ -3125,7 +3126,7 @@ DWORD DispatchEvent(
 
 			EventProcess( &SYSMONEVENT_IMAGE_LOAD_Type, eventBuffer, eventHeader, (PSID)ExtGetPtrX( imageLoad, IL_Sid, NULL ) );
 		}
-		free(imageLoad->m_HashBuffer);
+		free( imageLoad->m_HashBuffer );
 		break;
 
 	case RemoteThread:
