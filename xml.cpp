@@ -1755,9 +1755,13 @@ ApplyConfigurationFile(
 									if( ruleName ) {
 										// Replace rulegroup for aggregate name.
 										curRuleName = ruleName;
+#if defined _WIN64 || defined _WIN32
 										MultiByteToWideChar( CP_UTF8, 0, (char*)ruleName, -1,
 												aggregation.name, _countof( aggregation.name ) );
 										aggregation.name[_countof( aggregation.name )-1] = 0x00;
+#elif defined __linux__
+										UTF8toUTF16( aggregation.name, (PCHAR)ruleName, _countof( aggregation.name ) );
+#endif
 									}
 
 									ruleBuilder.AddAggregationEntry( &aggregation );

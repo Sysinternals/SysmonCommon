@@ -131,7 +131,12 @@ GUID GenerateUniqueId(
 	DWORD seconds = 0;
 	PBYTE pResult = (PBYTE)&result;
 
+#if defined _WIN64 || defined _WIN32
 	RtlTimeToSecondsSince1970( timestamp, &seconds );
+#elif defined __linux__
+    // timestamp in 100ns intervals since epoch
+    seconds = LargeTimeToSeconds( timestamp );
+#endif
 
 	*(DWORD*) pResult = machineId;
 	pResult += sizeof(DWORD);
@@ -692,9 +697,9 @@ VOID TimestampFormat(
     // time in 100ns intervals since epoch
     struct tm timeFields;
     time_t fileTime = 0;
-    DWORD seconds = 0;
-    RtlTimeToSecondsSince1970( timestamp, &seconds );
-    fileTime = seconds;
+
+    // timestamp in 100ns intervals since epoch
+    fileTime = LargeTimeToSeconds( timestamp );
 
     if ( gmtime_r(&fileTime, &timeFields) ) {
 
@@ -826,7 +831,11 @@ PWCHAR ExtGetAnsiString(
 
 		return NULL;
 	}
+#if defined _WIN64 || defined _WIN32
 	*size = MultiByteToWideChar( CP_ACP, MB_PRECOMPOSED, (LPCSTR) ptr, origSize, NULL, 0 );
+#elif defined __linux__
+    *size = UTF8toUTF16( NULL, (LPCSTR) ptr, 0 );
+#endif
 	if( *size == 0 ) {
 
 		return NULL;
@@ -837,7 +846,11 @@ PWCHAR ExtGetAnsiString(
 
 	if( str != NULL ) {
 
+#if defined _WIN64 || defined _WIN32
 		MultiByteToWideChar( CP_ACP, MB_PRECOMPOSED, (LPCSTR)ptr, origSize, str, *size );
+#elif defined __linux__
+        UTF8toUTF16( str, (LPCSTR)ptr, *size );
+#endif
 	}
 	return str;
 }
@@ -1036,7 +1049,11 @@ PTCHAR ExtTranslateNtPath(
 		return NULL;
 	}
 
+#if defined _WIN64 || defined _WIN32
 	return TranslateNtPath( ptr, size );
+#elif defined __linux__
+    return DupStringWithoutNullChar( ptr, size );
+#endif
 }
 
 //--------------------------------------------------------------------
@@ -1725,11 +1742,16 @@ EventResolveField(
 	case N_RegistryPath:
 		EventSetFieldS( EventBuffer, FieldIndex, TranslateRegistryPath( ptr, size ), TRUE );
 		break;
-#endif
+
 	case N_UnicodePath:
 		EventSetFieldS( EventBuffer, FieldIndex, TranslateNtPath( ptr, size ), TRUE );
 		break;
-
+#elif defined __linux__
+// don't translate path on Linux
+	case N_UnicodePath:
+		EventSetFieldS( EventBuffer, FieldIndex, DupStringWithoutNullChar( (PTCHAR)ptr, size ), TRUE );
+		break;
+#endif
 	case N_Ulong:
 		if( inType == I_UInt16 ) {
 
@@ -2071,7 +2093,11 @@ EventResolveField(
 				break;
 
 			case N_GUID:
+#if defined _WIN64 || defined _WIN32
 				StringFromGUID2( *(const GUID *)ptr, (LPOLESTR) tmpStringBuffer, _countof(tmpStringBuffer) );
+#elif defined __linux__
+				StringFromGUID2( *(const GUID *)ptr, tmpStringBuffer, _countof(tmpStringBuffer) );
+#endif
 				EventDataDescCreateS( &Output[FieldIndex], _tcsdup( tmpStringBuffer ) );
 				EventDataMarkAllocated( &Output[FieldIndex] );
 				break;
