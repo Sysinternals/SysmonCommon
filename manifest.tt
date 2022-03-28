@@ -390,7 +390,7 @@ SIZE_T AllEventsCount = _countof(AllEvents);
 
 PSYSMON_EVENT_TYPE_FMT EventTypesById[] = {
 <#
-	for (int i = 0; i < maxid; i++) {
+	for (int i = 0; i <= maxid; i++) {
 		string val = "NULL";
 		if (eventIdTableDict.ContainsKey(i)) {
 			val = "&" + eventIdTableDict[i] + "_Type";

@@ -31,9 +31,9 @@ extern char _binary_manifest_xml_end[];
 // LoadFileInResource
 //
 //--------------------------------------------------------------------
-#if defined _WIN64 || defined _WIN32
 BOOL LoadFileInResource(TCHAR* name, TCHAR* type, DWORD* size, char** data)
 {
+#if defined _WIN64 || defined _WIN32
     HMODULE handle = GetModuleHandle(NULL);
     HRSRC rc = FindResource(handle, name, type);
     HGLOBAL rcData = LoadResource(handle, rc);
@@ -46,8 +46,16 @@ BOOL LoadFileInResource(TCHAR* name, TCHAR* type, DWORD* size, char** data)
     memset(*data, 0, *size + 2);
     memcpy(*data, dataRc, *size);
     return TRUE;
-}
+#elif defined __linux__
+    *size = _binary_manifest_xml_end - _binary_manifest_xml_start;
+    *data = (PTCHAR)malloc(*size + 1);
+    if (NULL == *data)
+        return FALSE;
+    memcpy(*data, _binary_manifest_xml_start, *size);
+    (*data)[*size] = 0x00;
+    return TRUE;
 #endif
+}
 
 void PrintSchema()
 {
@@ -58,24 +66,11 @@ void PrintSchema()
     PTCHAR schemaVersion = (PTCHAR)OPT_VALUE( PrintSchema );
     DWORD size;
 
-#if defined _WIN64 || defined _WIN32
     if (!LoadFileInResource( _T( "Sysmonschema" ), _T( "XML" ), &size, (char **) &schema ))
     {
         printf("Out of memory\n");
         exit(E_OUTOFMEMORY);
     }
-
-
-#elif defined __linux__
-    size = _binary_manifest_xml_end - _binary_manifest_xml_start;
-    schema = (PTCHAR)malloc(size + 1);
-    if (schema == NULL) {
-        printf("Out of memory\n");
-        exit(E_OUTOFMEMORY);
-    }
-    memcpy(schema, _binary_manifest_xml_start, size);
-    schema[size] = 0x00;
-#endif
 
     BOOLEAN dumpAll = schemaVersion && !_tcsicmp( schemaVersion, _T( "all" ) );
     PTCHAR curSchema = _tcsstr( schema, _T( "<manifest" ) );

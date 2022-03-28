@@ -21,7 +21,7 @@
 #if defined _WIN64 || defined _WIN32
 #include "..\exe\windowsTypes.h"
 #define NTDDI_WIN8                          0x06020000
-#define NTDDI_VERSION NTDDI_WIN8
+#define NTDDI_VERSION NTDDI_WINBLUE
 #include <SDKDDKVer.h>
 
 // for signer.cpp
