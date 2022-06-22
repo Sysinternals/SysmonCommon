@@ -2223,7 +2223,7 @@ TEST( Rules, ProcessEventRules )
             SCOPED_TRACE( fieldValues.Description );
             PWCHAR ruleName = NULL;
             LARGE_INTEGER eventTime;
-            SYSMON_DATA_DESCRIPTOR eventBuffer[SYSMON_MAX_EVENT_Fields] = { (NativeTypes)0 };
+            SYSMON_DATA_DESCRIPTOR eventBuffer[SYSMON_MAX_EVENT_Fields] = {{(NativeTypes) 0}};
 
             // Set all fields in the event buffer, the rest won't be available.
             for( auto& field : fieldValues.Fields ) {

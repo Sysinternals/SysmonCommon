@@ -312,7 +312,7 @@ public:
 			// No entry so the blob is not set
 			//
 			D_ASSERT( blob == NULL );
-			RULE_REG_EXT baseRule = {0,};
+			RULE_REG_EXT baseRule = {{0}};
 
 			baseRule.header.Version = blobVersion;
 			baseRule.RuleRegSize = sizeof(baseRule);
@@ -353,7 +353,7 @@ public:
 
 	HRESULT UndoEventAdd()
 	{
-		if( lastEventOffset == 0 || prevLastEventOffset == ULONG_MAX ) {
+		if( lastEventOffset == 0 || (unsigned long)prevLastEventOffset == ULONG_MAX ) {
 
 			// Can't undo more than the very last event (no undo history).
 			return E_OUTOFMEMORY;
@@ -1195,7 +1195,7 @@ ApplyConfigurationFile(
 	ULONG							version = 0;
 	PCONFIGURATION_OPTION_TYPE		option;
 	PSYSMON_EVENT_TYPE_FMT			rule = NULL;
-	ADD_RULES						addRules[10] = {0,};
+	ADD_RULES						addRules[10] = {{0}};
 	ULONG							aggregationId = 0;
 #if defined _WIN64 || defined _WIN32
 	size_t							convertedChars = 0;
