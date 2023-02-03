@@ -54,7 +54,7 @@ PrintUsageText(
 
 			*curPtr = 0;
 			_fputts(curLine, stderr);
-			_fputtc(_T('\n'), stderr); 
+			_fputtc(_T('\n'), stderr);
 			curPtr++;
 			lastSpaceOffset = -1;
 			curLine = curPtr;
@@ -193,6 +193,9 @@ Usage(
 #endif
 	_ftprintf(stderr, _T("  -u   Uninstall service and driver. Adding force causes uninstall to proceed\n"));
 	_ftprintf(stderr, _T("       even when some components are not installed.\n" ));
+#ifdef __linux__
+    _ftprintf(stderr, _T("  -btf Use the specified standalone BTF file.\n"));
+#endif
 	_ftprintf(stderr, _T("\n"));
 
 	PrintUsageText(csbi,
@@ -273,7 +276,7 @@ ConfigUsage(
 		_ftprintf(stderr, _T("</Sysmon>\n"));
 		_ftprintf(stderr, _T("\n"));
 
-	PrintUsageText(csbi, 
+	PrintUsageText(csbi,
 		_T("The configuration file contains a schemaversion attribute on the Sysmon tag.")
 		_T("This version is independent from the Sysmon binary version and allows the ")
 		_T("parsing of older configuration files. The current schema version is shown in the ")
@@ -287,7 +290,7 @@ ConfigUsage(
 		_T("though its filter tag.\n\n")
 
 		_T("Configuration entries include the following:\n\n")
-		
+
 		_T("  Entry                 Value     Description\n")
 		_T("  ArchiveDirectory      String    Name of directories at volume roots into which copy-on-delete\n")
 		_T("                                  files are moved. The directory is protected with a System ACL.\n")
@@ -314,7 +317,7 @@ ConfigUsage(
         _T("                                  that specify the maximum sizes for field output.\n")
         _T("                                  (example 'CommandLine:100,Image:20').\n")
 
-		_T("Event filtering allows you to filter generated events. In many cases events can ") 
+		_T("Event filtering allows you to filter generated events. In many cases events can ")
 		_T("be noisy and gathering everything is not possible. For example, you might be ")
 		_T("interested about network connections only for a certain process, but not all ")
 		_T("of them. You can filter the output on the host reducing the data to collect.\n\n")
@@ -345,7 +348,7 @@ ConfigUsage(
 
 		_T("The onmatch filter is applied if events are matched. It can be changed ")
 		_T("with the \"onmatch\" attribute for the filter tag. If the value is 'include', ")
-		_T("it means only matched events are included. If it is set to 'exclude', the ") 
+		_T("it means only matched events are included. If it is set to 'exclude', the ")
 		_T("event will be included except if a rule match.\n\n")
 
 		_T("Each tag under the filter tag is a fieldname from the event. Each field ")
@@ -424,10 +427,10 @@ ConfigUsage(
 		_T("    <RuleGroup name=\"group 1\" groupRelation=\"or\">\n")
 		_T("      <ProcessCreate onmatch=\"include\">\n")
 		_T("        <Image condition=\"contains any\">chrome.exe;firefox.exe;iexplore.exe</Image>\n")
-		_T("        <Rule name=\"powershell by cmd\" groupRelation=\"and\">\n")		
+		_T("        <Rule name=\"powershell by cmd\" groupRelation=\"and\">\n")
 		_T("          <Image condition=\"end with\">powershell.exe</Image>\n")
 		_T("          <ParentImage condition=\"contains\">cmd.exe</ParentImage>\n")
-		_T("        </Rule>\n")			
+		_T("        </Rule>\n")
 		_T("        <Rule groupRelation=\"and\">\n")
 		_T("          <Image condition=\"end with\">cmd.exe</Image>\n")
 		_T("          <ParentImage condition=\"end with\">explorer.exe</ParentImage>\n")

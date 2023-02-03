@@ -1,6 +1,7 @@
 // Set of utilities for make it easier to build unittests.
 #if defined __linux__
 #include "linuxTypes.h"
+#include <unistd.h>
 #define TRUE true
 #define FALSE false
 #define ULONG_MAX 0xFFFFFFFFUL
