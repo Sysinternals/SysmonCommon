@@ -16,6 +16,7 @@ If you have any questions, feel free to ask Mark Russinovich.
         <option switch="m" name="Manifest" argument="none" target="all" noconfig="true" exclusive="true" />
         <option switch="z" name="ClipboardInstance" argument="required" target="all" noconfig="true" exclusive="true" />
         <option switch="t" name="DebugMode" argument="optional" target="all" noconfig="true" />
+        <option switch="btf" name="BTF" argument="optional" target="all" noconfig="true" />
         <option switch="service" name="Service" argument="none" target="all" noconfig="true" />
         <option switch="s" name="PrintSchema" argument="optional" target="all" noconfig="true" exclusive="true"/>
         <option switch="nologo" name="NoLogo" argument="none" target="all" noconfig="true" />
