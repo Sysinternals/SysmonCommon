@@ -2361,7 +2361,7 @@ EventProcess(
             size_t ruleNameUTF8Size = UTF16toUTF8( NULL, ruleName, 0 );
             char* ruleNameUTF8 = (char*) malloc(ruleNameUTF8Size);
             UTF16toUTF8( ruleNameUTF8, ruleName, ruleNameUTF8Size );
-            EventSetFieldS( EventBuffer, 0, ruleNameUTF8, FALSE );
+            EventSetFieldS( EventBuffer, 0, ruleNameUTF8, TRUE );
         } else {
             EventSetFieldS( EventBuffer, 0, "", FALSE );
         }
