@@ -217,8 +217,6 @@ Usage(
 #if defined _WIN64 || defined _WIN32
 		_T("Specify -accepteula to automatically accept the EULA on installation, otherwise ")
 		_T("you will be interactively prompted to accept it.\n")
-#elif defined __linux__
-        _T("Specify -accepteula to automatically accept the EULA on installation.\n")
 #endif
 		_T("\n")
 		_T("Neither install nor uninstall requires a reboot.\n")
