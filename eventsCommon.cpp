@@ -54,7 +54,7 @@ BOOLEAN 				bPreVista = TRUE;
 #endif
 
 //
-// Command line can be up to 0x7FFE but event log strings have a limit 
+// Command line can be up to 0x7FFE but event log strings have a limit
 // of 31839 characters (https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-reporteventa)
 //
 #define PATH_MAX_SIZE 31839
@@ -143,7 +143,7 @@ GUID GenerateUniqueId(
 	*(DWORD*) pResult = seconds;
 	pResult += sizeof(DWORD);
 	*(DWORD64*) pResult = ProcessStartKey;
-	
+
 	return result;
 }
 
@@ -495,7 +495,7 @@ void GenerateUniquePGUID(
 
 	// Update the cache
 	if( Cache ) {
-		
+
 		ProcessCache::Instance().ProcessAdd( g, event );
 	}
 
@@ -522,7 +522,7 @@ void FetchUniquePGUID(
 	PSYSMON_EVENT_HEADER		event;
 
 	ProcessCache::Instance().LockCache();
-	
+
 	cache = ProcessCache::Instance().ProcessGet( ProcessId, time, NULL );
 
 	if( cache ) {
@@ -530,7 +530,7 @@ void FetchUniquePGUID(
 		*pguid = cache->uniqueProcessGUID;
 		ProcessCache::Instance().UnlockCache();
 	} else {
-		
+
 		ProcessCache::Instance().UnlockCache();
 
 #if defined _WIN64 || defined _WIN32
@@ -539,8 +539,8 @@ void FetchUniquePGUID(
 		cacheRequest.ProcessId = ProcessId;
 		cacheRequest.UpdateCache = UpdateCache;
 
-	   	result  = DeviceIoControl( g_hDriver, IOCTL_SYSMON_PROCESS_CACHE, &cacheRequest, sizeof(cacheRequest), 
-								   buffer, sizeof(buffer), &bytesReturned, NULL ); 
+	   	result  = DeviceIoControl( g_hDriver, IOCTL_SYSMON_PROCESS_CACHE, &cacheRequest, sizeof(cacheRequest),
+								   buffer, sizeof(buffer), &bytesReturned, NULL );
 		if( result ) {
 
 			D_ASSERT(bytesReturned > 0);
@@ -689,7 +689,7 @@ VOID TimestampFormat(
 					 timeFields.wYear, timeFields.wMonth, timeFields.wDay,
 					 timeFields.wHour, timeFields.wMinute, timeFields.wSecond, timeFields.wMilliseconds );
 	} else {
-		
+
 		_stprintf_s( buffer, bufferCount, _T("Incorrect filetime: 0x%I64x"),
 					 timestamp->QuadPart );
 	}
@@ -738,7 +738,7 @@ PVOID ExtGetPtr(
 
 		*retSize = size;
 	}
-	
+
 	if( size == 0 ) {
 
 		return NULL;
@@ -912,7 +912,7 @@ BOOLEAN IsNullTerminated(
 
 		return FALSE;
 	}
-	
+
 	PTCHAR str = (PTCHAR)ptr;
 	size /= sizeof(TCHAR);
 	return ( str[size-1] == 0 );
@@ -931,7 +931,7 @@ PTCHAR DupStringWithoutNullChar(
 	)
 {
 	PTCHAR str;
-	
+
 	if( input == NULL || sizeInByte < sizeof(TCHAR) ) {
 
 		return NULL;
@@ -976,7 +976,7 @@ PTCHAR ReplaceAndDup(
 {
 	ULONG	newSize, replaceSize, sizeCch;
 	PTCHAR	str, pos;
-	
+
 	if( Input == NULL || SizeInBytes < sizeof(TCHAR) ) {
 
 		return NULL;
@@ -988,7 +988,7 @@ PTCHAR ReplaceAndDup(
 
 		return NULL;
 	}
-	
+
 	replaceSize = (ULONG)_tcslen( Replacement );
 	newSize = sizeCch + replaceSize - SubCch;
 
@@ -1101,7 +1101,7 @@ BOOLEAN TrimStringByNChars(
 
 		int end = maxCharsToTrim > pathlen ? minlength + ellipsis : pathlen - maxCharsToTrim;
         end = (end > minlength + ellipsis) ? end : minlength + ellipsis;
-		
+
 		path[end - 3] =
 			path[end - 2] =
 			path[end - 1] = _T('.');
@@ -1196,14 +1196,14 @@ VOID FetchImageName(
 	// Look at the cache first
 	//
 	ProcessCache::Instance().LockCache();
-	
+
 	cache = ProcessCache::Instance().ProcessGet( ProcessId, time , NULL );
 
 	if( cache ) {
-		
-		processInfo = cache->data;	
+
+		processInfo = cache->data;
 		imagePath = ExtTranslateNtPath( processInfo->m_Extensions, processInfo + 1,
-										PC_ImagePath );		
+										PC_ImagePath );
 
 		_tcsncpy_s( Buffer, Size, imagePath,_TRUNCATE );
 		ret = TRUE;
@@ -1265,7 +1265,7 @@ VOID FetchImageName(
 
 		wcsncpy_s( Buffer, Size, moduleEntry.szExePath, _TRUNCATE);
 	}
-	
+
 	CloseHandle( hSnap );
 
 #elif defined __linux__
@@ -1306,7 +1306,7 @@ EventSetFieldD(
 	if( DataDescriptor[FieldIndex].Ptr != NULL ) {
 
 		if( DataDescriptor[FieldIndex].Allocated ) {
-			
+
 			free( DataDescriptor[FieldIndex].Ptr );
 		}
 	}
@@ -1342,7 +1342,7 @@ EventSetFieldS(
 		}
 		String = emptyField;
 		Allocated = FALSE;
-	} 
+	}
 
 	stringLength = (ULONG)(_tcslen(String) + 1) * sizeof(TCHAR);
 
@@ -1372,7 +1372,7 @@ EventSetFieldExt(
 	PVOID	ptr = NULL;
 	ULONG	size = 0;
 	BOOLEAN allocated = FALSE;
-	
+
 	if( Type == N_UnicodeString || Type == N_EscapeUnicodeString ) {
 
 		if( Type == N_EscapeUnicodeString ) {
@@ -1385,7 +1385,7 @@ EventSetFieldExt(
 		}
 
 		if( ptr != NULL ) {
-			
+
 			allocated = TRUE;
 			size = (ULONG)(_tcslen((PTCHAR)ptr) + 1) * sizeof(TCHAR);
 		} else {
@@ -1493,7 +1493,7 @@ EventSetFieldExt(
 			return;
 		}
 	} else {
-		
+
 		ptr = ExtGetPtr( extensionsSizes, extensions, index, &size );
 	}
 
@@ -1514,7 +1514,7 @@ EventFieldDup(
 	)
 {
 	PVOID dup;
-	
+
 	if( DataDescriptor[FieldIndex].Ptr == NULL ) {
 
 		return;
@@ -1655,7 +1655,7 @@ EventResolveField(
 // On Linux, don't implement hashes yet
 #if defined _WIN64 || defined _WIN32
 	} else if( currentBuffer->Type == N_Hash ) {
-			
+
 		if( !GetHashTypeInformation( EventType, EventHeader, &hashType, &fileIndex ) ) {
 
 			return ERROR_INVALID_PARAMETER;
@@ -1698,7 +1698,7 @@ EventResolveField(
 			error = EventResolveField( Time, EventType, EventBuffer, EventHeader, F_CP_ParentProcessId, Output, ForceOutputString );
 
 			if( error != ERROR_SUCCESS ) {
-					
+
 				goto error;
 			}
 		} else {
@@ -1707,7 +1707,7 @@ EventResolveField(
 
 				DBG_MODE( _tprintf(_T("[!] Default string for %s on %s - %p,%d\n"),
 								   EventType->FieldNames[FieldIndex], EventType->EventName,
-								   currentBuffer->Ptr, currentBuffer->Size ) ); 
+								   currentBuffer->Ptr, currentBuffer->Size ) );
 				EventSetFieldS( EventBuffer, FieldIndex, NULL, FALSE );
 			} else {
 
@@ -1720,7 +1720,7 @@ EventResolveField(
 	*tmpStringBuffer = 0;
 	ptr = currentBuffer->Ptr;
 	size = currentBuffer->Size;
-	
+
 	switch( currentBuffer->Type ) {
 	case N_UnicodeString:
 	case N_EscapeUnicodeString:
@@ -1757,14 +1757,14 @@ EventResolveField(
 
 			// Correct the size
 			if( EventBuffer[FieldIndex].Size == sizeof(ULONG) ) {
-				
+
 				EventBuffer[FieldIndex].Size = sizeof(WORD);
 			}
 		} else if( (inType != I_UInt32 && inType != I_Boolean && inType != I_HexInt32) || size != sizeof(ULONG) ) {
-			
+
 			error = ERROR_INVALID_PARAMETER;
 			goto error;
-		} 
+		}
 		break;
 
 	case N_Ulong64:
@@ -1777,14 +1777,14 @@ EventResolveField(
 
 	case N_Ptr:
 		if( (inType != I_UnicodeString) || size != sizeof(PVOID) ) {
-			
+
 			error = ERROR_INVALID_PARAMETER;
 			goto error;
 		}
 		_stprintf_s( tmpStringBuffer, _countof(tmpStringBuffer), _T("0x%p"), *(PVOID*) ptr );
 		EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
 		break;
-		
+
 	case N_LargeTime:
 		if( inType != I_UnicodeString || size != sizeof(LARGE_INTEGER) ) {
 
@@ -1795,7 +1795,7 @@ EventResolveField(
 		TimestampFormat( tmpStringBuffer, _countof(tmpStringBuffer), (LARGE_INTEGER*)ptr );
 		EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
 		break;
-		
+
 	case N_ProcessId:
 		if( size != sizeof(ULONG) ) {
 
@@ -1831,10 +1831,10 @@ EventResolveField(
 			//
 			ZeroMemory( &tmpGuid, sizeof(tmpGuid) );
 			if( EventType == &SYSMONEVENT_CREATE_PROCESS_Type ) {
-				
+
 				GenerateUniquePGUID( &tmpGuid, EventHeader, TRUE );
 			} else {
-				
+
 				FetchUniquePGUID( &tmpGuid, *(ULONG*)ptr, TRUE, Time );
 			}
 			EventSetFieldX( EventBuffer, FieldIndex, N_GUID, tmpGuid );
@@ -1871,7 +1871,7 @@ EventResolveField(
 			EventFieldDup( EventBuffer, FieldIndex );
         }
 		break;
-		
+
 	case N_Sid:
 		if( inType != I_UnicodeString && size < sizeof( SID ) ) {
 
@@ -1892,7 +1892,7 @@ EventResolveField(
 
 				strPtr = GetIntegrityLevel( (PSID)ptr );
 			} else {
-			
+
 				strPtr = DefaultString;
 			}
 
@@ -1926,12 +1926,12 @@ EventResolveField(
 		numTraceItems = size / sizeof(SYSMON_RESOLVED_TRACE);
 
 		if( numTraceItems > SYSMON_MAX_SBT_FRAMES ) {
-			
+
 			numTraceItems = SYSMON_MAX_SBT_FRAMES;
 		}
 
 		if( 0 == numTraceItems || NULL == pResolvedTraceItem ) {
-			
+
 			EventSetFieldS( EventBuffer, FieldIndex, NULL, FALSE );
 		} else {
 
@@ -1951,7 +1951,7 @@ EventResolveField(
 			//
 			for( dwCallCount = 0;
 				 dwCallCount < numTraceItems;
-				 dwCallCount++ ) 
+				 dwCallCount++ )
 			{
 				TCHAR tmpString[_countof(((SYSMON_RESOLVED_TRACE*)0)->m_ModulePath) +sizeof("|+0xffffffff`ffffffff(wow64)") + sizeof('\0')];
 
@@ -1991,7 +1991,7 @@ EventResolveField(
 		}
 		break;
 #endif
-		
+
 	default:
 		error = ERROR_INVALID_PARAMETER;
 		break;
@@ -2039,7 +2039,7 @@ EventResolveField(
 				  currentBuffer->Type == N_GUID ||
 				  currentBuffer->Type == N_LogonId ||
 				  currentBuffer->Type == N_ProcessId );
-		
+
 		if( ForceOutputString && ( currentBuffer->Type != N_UnicodeString && currentBuffer->Type != N_RegistryPath &&
 				currentBuffer->Type != N_EscapeUnicodeString && currentBuffer->Type != N_UnicodePath ) ) {
 
@@ -2278,7 +2278,7 @@ EventProcess(
 	if( (EventType != &SYSMONEVENT_SERVICE_STATE_CHANGE_Type && EventType != &SYSMONEVENT_SERVICE_CONFIGURATION_CHANGE_Type ) &&
 		EventType != &SYSMONEVENT_ERROR_Type &&
 		((EventData == NULL || !EventData->m_PreFiltered)) ) {
-		
+
 		DBG_MODE_VERBOSE(_tprintf(_T("[R] Checking filter for %d\n"), EventType->EventId));
 
 		//
@@ -2359,7 +2359,7 @@ EventProcess(
 #elif defined __linux__
         if (ruleName) {
             size_t ruleNameUTF8Size = UTF16toUTF8( NULL, ruleName, 0 );
-            char ruleNameUTF8[ruleNameUTF8Size];
+            char* ruleNameUTF8 = (char*) malloc(ruleNameUTF8Size);
             UTF16toUTF8( ruleNameUTF8, ruleName, ruleNameUTF8Size );
             EventSetFieldS( EventBuffer, 0, ruleNameUTF8, FALSE );
         } else {
@@ -2416,18 +2416,18 @@ EventProcess(
 		if (descriptorSize > MAX_EVENT_PACKET_SIZE)
 		{
 			// Start by trimming the parent command line. The intuition here is that we can sacrifice the parent command line more readily than that
-			// of the child because the parent command line was already logged when that process was created 
+			// of the child because the parent command line was already logged when that process was created
 			if (TrimStringByNChars(((PTCHAR)(ULONG_PTR)Output[F_CP_ParentCommandLine].Ptr),  MAX_PATH, (descriptorSize - MAX_EVENT_PACKET_SIZE) / sizeof(TCHAR)))
 			{
 				Output[F_CP_ParentCommandLine].Size = (ULONG)((sizeof('\0') + _tcslen((PTCHAR)Output[F_CP_ParentCommandLine].Ptr)) * sizeof(TCHAR));
 			}
 
-			// Hopefully that's enough but if not reduce the size of the command line too 
+			// Hopefully that's enough but if not reduce the size of the command line too
 			descriptorSize = GetDescriptorSize(Output, SYSMONEVENT_CREATE_PROCESS_Count);
 			if (descriptorSize > MAX_EVENT_PACKET_SIZE)
 			{
 				// Start by trimming the parent command line. The intuition here is that we can sacrifice the parent command line more readily than that
-				// of the child because the parent command line was already logged when that process was created 
+				// of the child because the parent command line was already logged when that process was created
 				if (TrimStringByNChars(((PTCHAR)(ULONG_PTR)Output[F_CP_CommandLine].Ptr), MAX_PATH, (descriptorSize - MAX_EVENT_PACKET_SIZE) / sizeof(TCHAR)))
 				{
 					Output[F_CP_CommandLine].Size = (ULONG)((sizeof('\0') + _tcslen((PTCHAR)Output[F_CP_CommandLine].Ptr)) * sizeof(TCHAR));
@@ -2453,8 +2453,8 @@ EventProcess(
 
 			OutStr[index] = (PTCHAR)(ULONG_PTR)Output[index].Ptr;
 		}
-			
-		if( !ReportEvent( g_hEventSource, EVENTLOG_INFORMATION_TYPE,	
+
+		if( !ReportEvent( g_hEventSource, EVENTLOG_INFORMATION_TYPE,
 						  0, EventType->EventLegacyId, UserSid, EventType->FieldCount, 0, (LPCWSTR *) OutStr, NULL ) ) {
 
 			error = GetLastError();
@@ -2562,7 +2562,7 @@ VOID ReportError(
 	}
 
 	if( !bInitialized ) {
-		
+
 		DBG_MODE( _ftprintf( stderr, _T("Could not report error in %s: %s\n"), ID, Description ) )
 	    else {
 			_tprintf( _T("%s Error: %s\n"), ID, Description );
@@ -2612,7 +2612,7 @@ DWORD InitTraceEvents(VOID)
 			if( regType != REG_SZ ) {
 
 				error = ERROR_INVALID_DATA;
-			} 
+			}
 		}
 		RegCloseKey( hDriverKey );
 	}
@@ -2727,7 +2727,7 @@ DWORD DispatchEvent(
 	PSYSMON_EVENT_TYPE_FMT			eventType;
 	PSYSMON_FILE_DELETE				fileDelete;
 	PSYSMON_RAWACCESS_READ			rawAccessRead;
-	
+
 #if defined _WIN64 || defined _WIN32
 	DWORD							bytesReturned;
 	PSYSMON_EVENT_HEADER			duplicate;
@@ -2752,13 +2752,13 @@ DWORD DispatchEvent(
 
 	case ConfigUpdate:
 		//
-		// Configuration updates are responded to by 
-		// the configuration change notification thread to 
+		// Configuration updates are responded to by
+		// the configuration change notification thread to
 		// avoid a deadlock with file delete caused by ETW
 		// DNS enab/edisable
 		//
 		break;
-		
+
 	case KernelError:
 		kernelError = &eventHeader->m_EventBody.m_KernelErrorEvent;
 		id = ExtGetString( kernelError->m_Extensions, kernelError + 1, KE_ID );
@@ -2798,7 +2798,7 @@ DWORD DispatchEvent(
 
 #if defined _WIN64 || defined _WIN32
 		imagePath = ExtTranslateNtPath(procCreate->m_Extensions, procCreate + 1, PC_ImagePath);
-		GetImageInformation ( imagePath, &fileVersion, &fileDescription, 
+		GetImageInformation ( imagePath, &fileVersion, &fileDescription,
 						&companyName, &productName, &originalFileName );
 		free(imagePath);
 		imagePath = NULL;
@@ -2882,8 +2882,8 @@ DWORD DispatchEvent(
 
 #if defined _WIN64 || defined _WIN32
 		//
-		// If the kernel event field is non-NULL, this is actually just a filter check rather than 
-		// an event 
+		// If the kernel event field is non-NULL, this is actually just a filter check rather than
+		// an event
 		//
 		if( fileDelete->m_TrackerId != (ULONG) -1 ) {
 
@@ -2922,7 +2922,7 @@ DWORD DispatchEvent(
 			// Signal the kernel
 			//
 			DBG_MODE_VERBOSE( _tprintf( _T( "FileDelete signaling driver\n" ) ) );
-			DeviceIoControl( g_hDriver, IOCTL_SYSMON_FILE_DELETE_FILTER_RESULT, 
+			DeviceIoControl( g_hDriver, IOCTL_SYSMON_FILE_DELETE_FILTER_RESULT,
 										&fileDeleteFilterResult, sizeof( fileDeleteFilterResult ),
 										NULL, 0, &bytesReturned, NULL );
 			EventFieldFree( &SYSMONEVENT_FILE_DELETE_Type, eventBuffer );
@@ -3061,7 +3061,7 @@ DWORD DispatchEvent(
 								 tmpStringBuffer, _countof(tmpStringBuffer), TRUE );
 
 					if( tmpStringBuffer[0] != 0 ) {
-						
+
 						imageLoad->m_HashBuffer = _tcsdup( tmpStringBuffer );
 					} else {
 
@@ -3104,8 +3104,8 @@ DWORD DispatchEvent(
 		//
 		// Get version information
 		//
-		GetImageInformation( imageLoad->m_FetchedImageName, 
-						&fileVersion, &fileDescription, &companyName, 
+		GetImageInformation( imageLoad->m_FetchedImageName,
+						&fileVersion, &fileDescription, &companyName,
 						&productName, &originalFileName );
 
 		//
@@ -3238,7 +3238,7 @@ DWORD DispatchEvent(
 			case PipeEventCreate:
 				EventProcess(&SYSMONEVENT_CREATE_NAMEDPIPE_Type, eventBuffer, eventHeader, NULL);
 				break;
-					
+
 			case PipeEventConnect:
 				EventProcess(&SYSMONEVENT_CONNECT_NAMEDPIPE_Type, eventBuffer, eventHeader, NULL);
 				break;
@@ -3266,7 +3266,7 @@ DWORD DispatchEvent(
 	if( error != ERROR_SUCCESS ) {
 
 		if( eventHeader->m_EventType != ConfigUpdate ) {
-			
+
 			PrintErrorEx( (PTCHAR)_T(__FUNCTION__), error, (PTCHAR)_T("Failed to process event %d"), eventHeader->m_EventType );
 		} else {
 
@@ -3330,7 +3330,7 @@ DWORD NetworkEvent(
 //
 // SendStateEvent
 //
-// Reports if Sysmon has started or stopped. 
+// Reports if Sysmon has started or stopped.
 //
 //--------------------------------------------------------------------
 DWORD SendStateEvent(
