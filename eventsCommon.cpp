@@ -1652,10 +1652,8 @@ EventResolveField(
 			EventSetFieldX( EventBuffer, F_CP_ParentProcessGuid, N_GUID, DefaultGuid );
 			EventSetFieldS( EventBuffer, F_CP_ParentUser, NULL, FALSE );
 		}
-// On Linux, don't implement hashes yet
-#if defined _WIN64 || defined _WIN32
 	} else if( currentBuffer->Type == N_Hash ) {
-
+#if defined _WIN64 || defined _WIN32
 		if( !GetHashTypeInformation( EventType, EventHeader, &hashType, &fileIndex ) ) {
 
 			return ERROR_INVALID_PARAMETER;
@@ -1684,9 +1682,24 @@ EventResolveField(
 							 tmpStringBuffer, _countof(tmpStringBuffer), FALSE );
 			}
 		}
-
-		EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
+#elif defined __linux__
+        void                    *eventPtr;
+        PTCHAR                  imagePath;
+    
+        switch(EventType->EventId){
+            case ProcessCreate:
+                eventPtr = (void *)&EventHeader->m_EventBody.m_ProcessCreateEvent;
+                imagePath  = ExtTranslateNtPath(((PSYSMON_PROCESS_CREATE)eventPtr)->m_Extensions, (PSYSMON_PROCESS_CREATE)eventPtr + 1, PC_ImagePath);
+                break;
+            default:
+                break;
+        }
+        
+        if(imagePath){
+             LinuxGetFileHash(imagePath, tmpStringBuffer, _countof(tmpStringBuffer));
+        }
 #endif
+		EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
 	} else if( currentBuffer->Ptr == NULL || currentBuffer->Size == 0 ) {
 
 		//
