@@ -64,9 +64,10 @@ bool CreateNetworkEvent( DWORD processId, DWORD threadId, EVENT_TYPE_NETWORK typ
 // String.h
 //
 
-// 
+//
 // A CBlob is a reference-counted blob of data
 //
+
 class CBlob
 {
 	class CData
@@ -103,17 +104,17 @@ public:
 	{
 	}
 
-	inline CBlob( size_t size ) 
+	inline CBlob( size_t size )
 		: m_Data( CData::NewData(size) )
 	{
 	}
 
-	inline CBlob( const void * data, size_t size ) 
+	inline CBlob( const void * data, size_t size )
 		: m_Data( CData::NewData(data,size) )
 	{
 	}
 
-	inline CBlob( const void * data1, size_t size1, const void * data2, size_t size2 ) 
+	inline CBlob( const void * data1, size_t size1, const void * data2, size_t size2 )
 		: m_Data( CData::NewData(data1,size1,data2,size2) )
 	{
 	}
@@ -184,7 +185,7 @@ public:
 		text = *this;
 #endif
 	}
-	
+
 	// special constructor for reading compacted strings
 	CString( const BYTE * str, size_t len );
 	inline CString( const TCHAR * str ) : m_Blob(str,ByteLen(str))
@@ -333,7 +334,7 @@ public:
 			memcpy( m_Base+m_Offset, buf, len );
 		}
 		m_Offset += len;
-		D_ASSERT( m_Base == NULL  ||  m_Offset <= m_Max ); 
+		D_ASSERT( m_Base == NULL  ||  m_Offset <= m_Max );
 	}
 	inline void ReadBytes( void * buf, DWORD len )
 	{
@@ -341,7 +342,7 @@ public:
 			throw ERROR_INSUFFICIENT_BUFFER;
 		memcpy( buf, m_Base+m_Offset, len );
 		m_Offset += len;
-		D_ASSERT( m_Offset <= m_Max ); 
+		D_ASSERT( m_Offset <= m_Max );
 	}
 	inline BYTE * SkipBytes( size_t len )
 	{
@@ -400,7 +401,7 @@ public:
 	{
 		ReadBytes( &ft, sizeof ft );
 	}
-	
+
 
 	inline void WriteBool( bool b )
 	{

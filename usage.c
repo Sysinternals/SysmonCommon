@@ -45,6 +45,9 @@ PrintUsageText(
 	short	lastSpaceOffset = -1;
 
 	textCopy = _tcsdup(Text);
+	if( textCopy == NULL) {
+		return;
+	}
 	curPtr = textCopy;
 	curLine = textCopy;
 
@@ -98,6 +101,7 @@ PrintUsageText(
 		}
 	}
 	_fputts(curLine, stderr);
+	free(textCopy);
 }
 
 
