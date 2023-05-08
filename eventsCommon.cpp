@@ -2266,11 +2266,15 @@ EventProcess(
 
 			if( SystemTimeToFileTime( &sysTime, &fileTime ) ) {
 
-				currentTime.LowPart = fileTime.dwLowDateTime;
-				currentTime.HighPart = fileTime.dwHighDateTime;
+				currentTime->LowPart = fileTime.dwLowDateTime;
+				currentTime->HighPart = fileTime.dwHighDateTime;
 
-				eventTime = &currentTime;
-				EventSetFieldX( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime );
+				eventTime = currentTime;
+				EventSetFieldD( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime, sizeof(LARGE_INTEGER), TRUE);
+			}
+			else {
+
+				free( currentTime );
 			}
 #elif defined __linux__
             GetSystemTimeAsLargeInteger( currentTime );
