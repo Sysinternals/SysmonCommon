@@ -1950,7 +1950,7 @@ ApplyConfigurationFile(
 						isValidXml = false;
 
 						_tprintf( _T( "Incorrect field %s\n" ), breakingField.c_str() );
-						D_ASSERT( SUCCEEDED( hr ) );
+						D_ASSERT( false );
 
 					}
 				}
