@@ -474,11 +474,11 @@ public:
 		else {
 			// Record the address of the first record in the header
 			PRULE_REG_EXT header = (PRULE_REG_EXT)blob;
-			D_ASSERT(0 == header->FirstAggregationOffset);
 			if (header == NULL) {
 				return E_FAIL;
 			}
 
+			D_ASSERT(0 == header->FirstAggregationOffset);
 			header->FirstAggregationOffset = blobSize;
 		}
 
