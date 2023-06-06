@@ -229,9 +229,16 @@ private:
 			return hr;
 		}
 
+#if defined __linux__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress"
+#endif
 		if( (PBYTE)blob+blobSize == 0 ) {
 			return E_FAIL;
 		}
+#if defined __linux__
+#pragma GCC diagnostic pop
+#endif
 
 		memcpy( (PBYTE)blob + blobSize, Ptr, Size );
 		blobSize += alignSize;
