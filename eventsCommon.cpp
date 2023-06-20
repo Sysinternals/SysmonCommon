@@ -1536,6 +1536,47 @@ EventFieldDup(
 					dup, DataDescriptor[FieldIndex].Size, TRUE );
 }
 
+#if defined __linux__
+//--------------------------------------------------------------------
+//
+// LinuxGetHashTypeInformation
+//
+// Get hash type information
+//
+//--------------------------------------------------------------------
+bool
+LinuxGetHashTypeInformation(
+_In_ PSYSMON_EVENT_TYPE_FMT EventType,
+_In_opt_ PSYSMON_EVENT_HEADER EventHeader,
+_In_ PULONG *HashType,
+_In_ PULONG FileIndex
+)
+{
+    if( EventHeader == NULL ) {
+    	return FALSE;
+    }
+    
+    if( EventType == &SYSMONEVENT_CREATE_PROCESS_Type ) {
+	    *HashType = &EventHeader->m_EventBody.m_ProcessCreateEvent.m_HashType;
+	    *FileIndex = F_CP_Image;
+    }
+    else if( EventType == &SYSMONEVENT_FILE_DELETE_Type ) {
+	    *HashType = &EventHeader->m_EventBody.m_FileDeleteEvent.m_HashType;
+	    *FileIndex = F_FD_TargetFilename;
+
+    }
+    else {
+        return FALSE;
+    }
+
+    if( **HashType == 0 ) {
+	    **HashType = SysmonCryptoCurrent();		// Default is sha256 
+    }
+    
+    return TRUE;
+}
+#endif
+
 //--------------------------------------------------------------------
 //
 // EventResolveField
@@ -1557,10 +1598,11 @@ EventResolveField(
 {
 	DWORD	error = ERROR_SUCCESS;
 	PSYSMON_DATA_DESCRIPTOR currentBuffer;
-#if defined _WIN64 || defined _WIN32
-	ULONG   fileIndex, dwCallCount;
-	ULONG	numTraceItems, allocSize;
+	ULONG   fileIndex;
 	PULONG	hashType = NULL;
+#if defined _WIN64 || defined _WIN32
+	ULONG   dwCallCount;
+	ULONG	numTraceItems, allocSize;
 	PSYSMON_RESOLVED_TRACE pResolvedTraceItem;
 	PTCHAR	strPtr = NULL;
 #endif
@@ -1687,21 +1729,15 @@ EventResolveField(
 			}
 		}
 #elif defined __linux__
-        void                    *eventPtr;
-        PTCHAR                  imagePath;
-    
-        switch(EventType->EventId){
-            case ProcessCreate:
-                eventPtr = (void *)&EventHeader->m_EventBody.m_ProcessCreateEvent;
-                imagePath  = ExtTranslateNtPath(((PSYSMON_PROCESS_CREATE)eventPtr)->m_Extensions, (PSYSMON_PROCESS_CREATE)eventPtr + 1, PC_ImagePath);
-                break;
-            default:
-                break;
-        }
-        
-        if(imagePath){
-             LinuxGetFileHash(imagePath, tmpStringBuffer, _countof(tmpStringBuffer));
-        }
+        if( !LinuxGetHashTypeInformation( EventType, EventHeader, &hashType, &fileIndex ) ) {
+			return ERROR_INVALID_PARAMETER;
+		}
+		
+		error = EventResolveField( Time, EventType, EventBuffer, EventHeader, fileIndex, Output, ForceOutputString );
+		
+		if( error == ERROR_SUCCESS ) {
+		    LinuxGetFileHash( *hashType, (PTCHAR)EventBuffer[fileIndex].Ptr, tmpStringBuffer, _countof(tmpStringBuffer));
+		}
 #endif
 		EventSetFieldS( EventBuffer, FieldIndex, _tcsdup( tmpStringBuffer ), TRUE );
 	} else if( currentBuffer->Ptr == NULL || currentBuffer->Size == 0 ) {
