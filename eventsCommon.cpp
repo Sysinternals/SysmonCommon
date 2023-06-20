@@ -1415,6 +1415,9 @@ EventSetFieldExt(
             Type = N_UnicodeString;
         } else {
 			EventSetFieldS( DataDescriptor, FieldIndex, NULL, FALSE );
+			if( cmdptr ) {
+				free( cmdptr );
+			}
 			return;
         }
     }
@@ -1607,7 +1610,8 @@ EventResolveField(
 		( FieldIndex == F_CP_ParentCommandLine ||
 		  FieldIndex == F_CP_ParentImage ||
 		  FieldIndex == F_CP_ParentProcessGuid ||
-		  FieldIndex == F_CP_ParentUser ) ) {
+		  FieldIndex == F_CP_ParentUser ) )
+	{
 
 		//
 		// Resolve parent information
@@ -2058,7 +2062,6 @@ EventResolveField(
 
 			*tmpStringBuffer = 0;
 			ptr = currentBuffer->Ptr;
-			size = currentBuffer->Size;
 
 			//
 			// Translate fields to strings
@@ -2242,7 +2245,7 @@ EventProcess(
 	DWORD					error = ERROR_SUCCESS;
 	InTypes					outputType;
 	EVENT_DATA_DESCRIPTOR 	Output[SYSMON_MAX_EVENT_Fields] = {0,};
-    LARGE_INTEGER			currentTime;
+    PLARGE_INTEGER			currentTime;
 	PLARGE_INTEGER			eventTime = NULL;
 	PWCHAR					ruleName = NULL;
 #if defined _WIN64 || defined _WIN32
@@ -2264,6 +2267,11 @@ EventProcess(
 		//
 		if( eventTime == NULL ) {
 
+			currentTime = (PLARGE_INTEGER) malloc( sizeof(LARGE_INTEGER) );
+			if( currentTime == NULL ) {
+				return ERROR_OUTOFMEMORY;
+			}
+
 #if defined _WIN64 || defined _WIN32
             SYSTEMTIME				sysTime;
             FILETIME				fileTime;
@@ -2271,16 +2279,20 @@ EventProcess(
 
 			if( SystemTimeToFileTime( &sysTime, &fileTime ) ) {
 
-				currentTime.LowPart = fileTime.dwLowDateTime;
-				currentTime.HighPart = fileTime.dwHighDateTime;
+				currentTime->LowPart = fileTime.dwLowDateTime;
+				currentTime->HighPart = fileTime.dwHighDateTime;
 
-				eventTime = &currentTime;
-				EventSetFieldX( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime );
+				eventTime = currentTime;
+				EventSetFieldD( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime, sizeof(LARGE_INTEGER), TRUE);
+			}
+			else {
+
+				free( currentTime );
 			}
 #elif defined __linux__
-            GetSystemTimeAsLargeInteger( &currentTime );
-            eventTime = &currentTime;
-            EventSetFieldX( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime );
+            GetSystemTimeAsLargeInteger( currentTime );
+            eventTime = currentTime;
+			EventSetFieldD( EventBuffer, EventType->EventTimeField, N_LargeTime, currentTime, sizeof(LARGE_INTEGER), TRUE);
 #endif
 		}
 	}

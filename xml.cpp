@@ -92,7 +92,7 @@ ParseVersionString(
 
 			// Starts at 1.0
 			if( ret == 0 ) {
-				
+
 				break;
 			}
 		} else {
@@ -166,7 +166,7 @@ private:
 	{
 		ULONG remain = (blobAllocated - blobSize);
 		if( Bytes == 0 || Bytes <= remain ) {
-			
+
 			return S_OK;
 		}
 
@@ -221,19 +221,30 @@ private:
 
 			return E_OUTOFMEMORY;
 		}
-		
+
 		HRESULT hr = Grow( alignSize );
 
 		if( FAILED( hr ) ) {
 
 			return hr;
 		}
-		
+
+#if defined __linux__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress"
+#endif
+		if( (PBYTE)blob+blobSize == 0 ) {
+			return E_FAIL;
+		}
+#if defined __linux__
+#pragma GCC diagnostic pop
+#endif
+
 		memcpy( (PBYTE)blob + blobSize, Ptr, Size );
 		blobSize += alignSize;
 		return S_OK;
 	}
-	
+
 public:
 	RuleBuilder(
 		VOID
@@ -265,7 +276,7 @@ public:
 		)
 	{
 		if( blob != NULL ) {
-			
+
 			free( blob );
 		}
 	}
@@ -328,6 +339,10 @@ public:
 			// Now that we have added the header update the offset of the first event to reflect the current location
 			// We do this because AddData rounds up the location for the next write to be ptr aligned
 			PRULE_REG_EXT header = (PRULE_REG_EXT)blob;
+			if( header == NULL ) {
+				return E_FAIL;
+			}
+
 			header->FirstEventOffset = blobSize;
 		}
 
@@ -384,7 +399,7 @@ public:
 		)
 	{
 		HRESULT hr;
-		
+
 		D_ASSERT( lastEventOffset != 0 );
 		PRULE_EVENT currentEvent = (PRULE_EVENT)((PBYTE)blob + lastEventOffset);
 
@@ -404,7 +419,10 @@ public:
 
 			PRULE_AGGREGATION currentAggregation = (PRULE_AGGREGATION)((PBYTE)blob + aggregationOffset);
 			D_ASSERT(NULL != currentAggregation && currentAggregation->aggregationId == RuleFilter->AggregationId);
-			
+			if( currentAggregation == NULL ) {
+				return E_FAIL;
+			}
+
 			// If this is the first entry in the aggregation, update the root node
 			if (0 == currentAggregation->rootRuleOffset) {
 
@@ -417,6 +435,10 @@ public:
 
 		// Because we can now include aggregation objects we can no longer assume that the start of the rule chain
 		// is at a fixed offset from the start so we need to make a note of that too
+		if( currentEvent == NULL ) {
+			return E_FAIL;
+		}
+
 		if (0 == currentEvent->FirstFilterOffset) {
 
 			currentEvent->FirstFilterOffset = blobSize;
@@ -435,7 +457,7 @@ public:
 		//
 		// Update the rule event count
 		//
-		
+
 		currentEvent->FilterCount++;
 
 		return S_OK;
@@ -459,6 +481,10 @@ public:
 		else {
 			// Record the address of the first record in the header
 			PRULE_REG_EXT header = (PRULE_REG_EXT)blob;
+			if (header == NULL) {
+				return E_FAIL;
+			}
+
 			D_ASSERT(0 == header->FirstAggregationOffset);
 			header->FirstAggregationOffset = blobSize;
 		}
@@ -690,7 +716,7 @@ GetFileContentWithDtd8(
 
 #if defined _WIN64 || defined _WIN32
 	size_t convertedChars = WideCharToMultiByte( CP_UTF8, WC_ERR_INVALID_CHARS, dtdContent, (int)_tcslen( dtdContent ), NULL, 0, NULL, NULL );
-	std::string dtdAndConfig( convertedChars, 0 ); 
+	std::string dtdAndConfig( convertedChars, 0 );
 	convertedChars = WideCharToMultiByte( CP_UTF8, WC_ERR_INVALID_CHARS, dtdContent, (int)_tcslen( dtdContent ), &dtdAndConfig[0], (int)convertedChars, NULL, NULL );
 #elif defined __linux__
 	std::string dtdAndConfig( dtdContent );
@@ -723,7 +749,7 @@ GetFileContentWithDtd8(
 			if( !xmlStrncasecmp( (xmlChar*)startPos, (xmlChar*)xmlTag, (int)strlen( xmlTag ) ) ) {
 
 				endPos = strstr( startPos + strlen( xmlTag ), endTag );
-					
+
 				if( endPos != NULL ) {
 
 					endPos += strlen( endTag );
@@ -847,7 +873,7 @@ FetchConfigurationVersion(
 			*Is16Bit = false;
 		}
 	}
-	
+
 	//
 	// read file with detected file encoding if there was no BOM
 	//
@@ -904,6 +930,11 @@ FetchConfigurationVersion(
 
 		printf( "Error: Invalid schema version number (%s) ", versionString );
 		_tprintf( _T(" for configuration: %s\n"), FileName );
+		if( *XMLEncoding != NULL ) {
+			free(*XMLEncoding);
+			*XMLEncoding = NULL;
+		}
+
 		xmlFree ( versionString );
 		return FALSE;
 	}
@@ -1034,7 +1065,7 @@ GetFieldIndex(
 			return index;
 		}
 	}
-	
+
 	return (WORD)-1;
 }
 
@@ -1241,7 +1272,7 @@ ApplyConfigurationFile(
 		} else {
 			printf( "Detected configuration file format is single-width character set\n" );
 		}
-		
+
 		if( xmlEncoding ) {
 			printf( "Detected XML encoding: '%s'\n", xmlEncoding );
 		}
@@ -1252,12 +1283,12 @@ ApplyConfigurationFile(
 		// If the version is not an exact match, remind the current schema version
 		//
 		if( version != ConfigurationVersion ) {
-		
+
 			_tprintf( _T("Sysmon schema version: %.2f\n"), TO_DOUBLE(ConfigurationVersion) );
 		}
 
 		ruleBuilder.SetVersion( version );
-	
+
 #if defined _WIN64 || defined _WIN32
 		convertedChars = WideCharToMultiByte( CP_UTF8, WC_ERR_INVALID_CHARS, FileName, -1, fileName, sizeof(fileName), NULL, NULL );
 		if (convertedChars == 0 ) {
@@ -1282,6 +1313,7 @@ ApplyConfigurationFile(
 
 			if( dataLen == 0 ) {
 
+				if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 				return FALSE;
 			}
 
@@ -1303,6 +1335,7 @@ ApplyConfigurationFile(
 
 			if( data.size() == 0 ) {
 
+				if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 				return FALSE;
 			}
 
@@ -1318,6 +1351,7 @@ ApplyConfigurationFile(
 		}
 
 		if( xmlDoc == NULL ) {
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			_tprintf( _T( "LIBXML2 Error: Failed to load xml configuration: %s\n" ), FileName );
 			return FALSE;
 		}
@@ -1329,6 +1363,7 @@ ApplyConfigurationFile(
 		if( !xmlValidCtx ) {
 			printf( "LIBXML2 Error: Failed to create libxml2 validation context\n" );
 			xmlFreeDoc( xmlDoc );
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			return FALSE;
 		}
 
@@ -1338,6 +1373,7 @@ ApplyConfigurationFile(
 			_tprintf( _T( "LIBXML2 Error: Failed to validate the xml configuration: %s\n" ), FileName );
 			xmlFreeValidCtxt( xmlValidCtx );
 			xmlFreeDoc( xmlDoc );
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			return FALSE;
 		}
 
@@ -1350,6 +1386,7 @@ ApplyConfigurationFile(
 		if( !xpathCtx ) {
 			_tprintf( _T( "Error: Failed to find Sysmon tag in configuration: %s\n" ), FileName );
 			xmlFreeDoc( xmlDoc );
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			return FALSE;
 		}
 
@@ -1361,10 +1398,12 @@ ApplyConfigurationFile(
 			}
 			xmlXPathFreeContext( xpathCtx );
 			xmlFreeDoc( xmlDoc );
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			return FALSE;
 		}
 
-		for( curNode = xpathObj->nodesetval->nodeTab[0]->children; curNode; curNode = curNode->next ) {
+		for( curNode = xpathObj->nodesetval->nodeTab[0]->children; curNode; curNode = curNode->next )
+		{
 			if( curNode->type == XML_ELEMENT_NODE ) {
 				if( !strcmp( (char*)curNode->name, "EventFiltering" ) ) {
 					continue;
@@ -1388,7 +1427,6 @@ ApplyConfigurationFile(
 
 				if( option == NULL ) {
 
-					hr = E_INVALIDARG;
 					xmlFree( nodeContent );
 					break;
 				}
@@ -1424,11 +1462,11 @@ ApplyConfigurationFile(
 
 #if defined _WIN64 || defined _WIN32
 					if( option->ValueFlag != ConfigNoValue &&
-						option->Option->Value != NULL && 
+						option->Option->Value != NULL &&
 						nodeContent_t != (BSTR)option->Option->Value ) {
 #elif defined __linux__
 					if( option->ValueFlag != ConfigNoValue &&
-						option->Option->Value != NULL && 
+						option->Option->Value != NULL &&
 						0 == strcmp(nodeContent_t, (PTCHAR)option->Option->Value) ) {
 #endif
 
@@ -1447,8 +1485,6 @@ ApplyConfigurationFile(
 					option->Option->Value = _tcsdup( nodeContent_t );
 
 					if( option->Option->Value == NULL ) {
-
-						hr = E_OUTOFMEMORY;
 
 						xmlFree( nodeContent );
 						break;
@@ -1470,6 +1506,7 @@ ApplyConfigurationFile(
 		if( !GetAdditionalRules( addRules, _countof( addRules ) ) ) {
 
 			_tprintf( _T( "Error: Failed to compute additional rules.\n" ) );
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			return FALSE;
 		}
 
@@ -1491,7 +1528,7 @@ ApplyConfigurationFile(
 				// Frame all the duplicate rules (we assume they're consecutive in manifest.xml!!
 				// between indexFirstOfSeries and (exclusively) indexLastOfSeries.
 				//
-				// 
+				//
 				SIZE_T indexFirstOfSeries = index;
 				SIZE_T indexLastOfSeries = indexFirstOfSeries + 1;
 				while( indexLastOfSeries < AllEventsCount && AllEvents[indexLastOfSeries]->RuleName != NULL &&
@@ -1590,7 +1627,6 @@ ApplyConfigurationFile(
 							//
 							if( !ruleDefault ) {
 								_tprintf( _T( "Error: You need to specifiy the onmatch attribute on %s.\n" ), rule->RuleName );
-								hr = E_INVALIDARG;
 								break;
 							} else {
 
@@ -1604,7 +1640,6 @@ ApplyConfigurationFile(
 							if( ruleDefault ) {
 
 								_tprintf( _T( "Error: Can't specify onmatch and default on %s (pick only one)\n" ), rule->RuleName );
-								hr = E_INVALIDARG;
 								break;
 							}
 
@@ -1644,7 +1679,6 @@ ApplyConfigurationFile(
 							_tprintf( _T( "Error: Incompatible configuration and command-line rule on %s" ),
 								rule->RuleName );
 
-							hr = E_INVALIDARG;
 							break;
 						}
 
@@ -1707,7 +1741,7 @@ ApplyConfigurationFile(
 						}
 
 						//
-						// curNode is the Event level node (ie ProcessCreate). Each child item is either 
+						// curNode is the Event level node (ie ProcessCreate). Each child item is either
 						// a rule or a <rule> element.
 						// Iterate over all children of event node.
 						//
@@ -1770,7 +1804,7 @@ ApplyConfigurationFile(
 								}
 
 								//
-								// <rule> loop 
+								// <rule> loop
 								// Iterate over the rule nodes. These can be either individual rules (in which case we only go through
 								// the following loop once) or rule aggregations that are bound via the <rule> tag, in which case
 								// we iterate over the children of the rule node.
@@ -1907,6 +1941,7 @@ ApplyConfigurationFile(
 
 								if( FAILED( hr ) ) {
 
+									if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 									_tprintf( _T( "Error: Failed to convert EventFiltering nodes: %s\n" ), FileName );
 									return FALSE;
 								}
@@ -1921,9 +1956,8 @@ ApplyConfigurationFile(
 						// specific xml entry, so the config asks for fields not specified by the schema.
 						isValidXml = false;
 
-						hr = E_INVALIDARG;
 						_tprintf( _T( "Incorrect field %s\n" ), breakingField.c_str() );
-						D_ASSERT( SUCCEEDED( hr ) );
+						D_ASSERT( false );
 
 					}
 				}
@@ -1939,6 +1973,7 @@ ApplyConfigurationFile(
 
 		if( !GetAdditionalRules( addRules, _countof(addRules) ) ) {
 
+			if( xmlEncoding ) free( xmlEncoding );
 			_tprintf( _T("Error: Failed to compute additional rules.\n") );
 			return FALSE;
 		}
@@ -1958,7 +1993,7 @@ ApplyConfigurationFile(
 	// Process elements that were not already added
 	//
 	if( addRules[0].eventType != NULL ) {
-		
+
 		hr = ERROR_SUCCESS;
 		for( ULONG i = 0; addRules[i].eventType != NULL; i++ ) {
 
@@ -1976,6 +2011,7 @@ ApplyConfigurationFile(
 
 			if( FAILED( hr ) ) {
 
+				if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 				break;
 			}
 
@@ -2019,9 +2055,10 @@ ApplyConfigurationFile(
 				break;
 			}
 		}
-		
+
 		if( FAILED( hr ) ) {
 
+			if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 			_tprintf( _T("Error: Failed to convert additional command-line rules\n") );
 			return FALSE;
 		}
@@ -2034,6 +2071,7 @@ ApplyConfigurationFile(
 	//
 	if( !InitializeRules() || !SetRuleBlob( *Rules, *RulesSize, Transform ) ) {
 
+		if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 		_tprintf( _T("Error: Failed to correctly compute rule binary format\n") );
 		return FALSE;
 	}
@@ -2187,6 +2225,7 @@ ApplyConfigurationFile(
 
 		_tprintf( _T("Configuration file validated.\n") );
 	}
-	
+
+	if( xmlEncoding ) { free( xmlEncoding ); xmlEncoding = NULL; }
 	return TRUE;
 }

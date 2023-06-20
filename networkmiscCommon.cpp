@@ -23,6 +23,8 @@
 #include "linuxTypes.h"
 #include "stdafx.h"
 #include "eventsCommon.h"
+#include <pthread.h>
+#include <time.h>
 
 LONG
 InterlockedIncrement(
@@ -116,8 +118,8 @@ LONG CBlob::CData::Release()
 }
 
 const void * CBlob::CData::Data() const
-{ 
-	return m_Data; 
+{
+	return m_Data;
 }
 
 DWORD CBlob::CData::Size() const
@@ -128,7 +130,7 @@ DWORD CBlob::CData::Size() const
 
 
 // assignment
-inline void CBlob::operator =( const CBlob & src ) 
+void CBlob::operator =( const CBlob & src )
 {
 	if ( m_Data )
 		m_Data->Release();
@@ -137,7 +139,7 @@ inline void CBlob::operator =( const CBlob & src )
 		m_Data->AddRef();
 }
 
-inline void CBlob::Assign( const void * data, size_t size ) 
+inline void CBlob::Assign( const void * data, size_t size )
 {
 	// allocate before releasing in case the
 	// data we're copying into the allocation
@@ -197,7 +199,7 @@ size_t CString::ByteLen( const TCHAR * str )
 	return str ? (_tcslen(str)+1)*sizeof str[0] : 0;
 }
 
-	
+
 // special constructor for reading compacted strings
 CString::CString( const BYTE * str, size_t len ) : m_Blob( (len+1)*sizeof(TCHAR) )
 {
@@ -275,7 +277,7 @@ bool CString::operator == (const CString & other) const
 // extract string
 CString::operator const TCHAR * () const
 {
-	const TCHAR * textPtr = (const TCHAR *)m_Blob.Data(); 
+	const TCHAR * textPtr = (const TCHAR *)m_Blob.Data();
 	if ( textPtr )
 		return textPtr;
 	else
@@ -289,7 +291,7 @@ CString CString::operator + ( const CString & other ) const
 	return result;
 }
 
-CString operator + ( const TCHAR * s1, const CString & s2 ) 
+CString operator + ( const TCHAR * s1, const CString & s2 )
 {
 	CString result;
 	result.m_Blob.Assign( s1, _tcslen(s1)*sizeof s1[0], s2.m_Blob.Data(), s2.m_Blob.Size() );
@@ -403,7 +405,7 @@ void CSerialize::AssignACL( const ACL *& ptr )
 
 void CSerialize::WriteSID( const SID * ptr )
 {
-	if ( ptr )  {			
+	if ( ptr )  {
 		DWORD sidLen = GetLengthSid( (PSID) ptr );
 		WriteDword( sidLen );
 		WriteBytes( ptr, sidLen );
@@ -624,7 +626,7 @@ bool CHostNameResolver::AddAddress( const BYTE * addr, bool isV6 )
 
 	{
 		CEnterCritical	crit( this );
-		
+
 		//
 		// Limit the number of working threads
 		//
@@ -642,19 +644,19 @@ bool CHostNameResolver::AddAddress( const BYTE * addr, bool isV6 )
 			m_AddrQueue.push( context );
 		    createThread = false;
 		} else {
-			
+
 			m_ThreadCount++;
 		}
 	}
-	
+
 	if( createThread ) {
-		
+
 #if defined _WIN64 || defined _WIN32
         UINT	id;
 		HANDLE hThread = (HANDLE)_beginthreadex( NULL, 0, AddThread, context, 0, &id );
 
 		if( hThread != INVALID_HANDLE_VALUE ) {
-		
+
 			CloseHandle( hThread );
 		}
 #elif defined __linux__
@@ -814,7 +816,7 @@ bool CPortNameResolver::AddPort( WORD port, bool isTCP )
 
 		return false;
 	}
-	
+
 	DWORD	pport = port | isTCP << 16;
 	bool	createThread = true;
 
@@ -852,7 +854,7 @@ bool CPortNameResolver::AddPort( WORD port, bool isTCP )
 
 	{
 		CEnterCritical	crit( this );
-		
+
 		//
 		// Limit the number of working threads
 		//
@@ -870,19 +872,19 @@ bool CPortNameResolver::AddPort( WORD port, bool isTCP )
 			m_PortQueue.push( context );
 		    createThread = false;
 		} else {
-			
+
 			m_ThreadCount++;
 		}
 	}
 
 	if( createThread ) {
-		
+
 #if defined _WIN64 || defined _WIN32
         UINT	id;
 		HANDLE hThread = (HANDLE)_beginthreadex( NULL, 0, AddThread, context, 0, &id );
 
 		if( hThread != INVALID_HANDLE_VALUE ) {
-		
+
 			CloseHandle( hThread );
 		}
 #elif defined __linux__
@@ -898,7 +900,7 @@ bool CPortNameResolver::AddPort( WORD port, bool isTCP )
 }
 
 CString CPortNameResolver::ResolvePort( WORD port, bool isTCP )
-{		
+{
 	DWORD	pport = port | isTCP << 16;
 
 	{
@@ -931,7 +933,7 @@ CString IPAddressToString( const BYTE * addr, bool isV6 )
 	TCHAR	name[ 60 ];
 	if ( isV6 )  {
 		const WORD	* ipv6format = (WORD *)addr;
-		_stprintf_s( name, _countof(name), _T("%x:%x:%x:%x:%x:%x:%x:%x"), 
+		_stprintf_s( name, _countof(name), _T("%x:%x:%x:%x:%x:%x:%x:%x"),
 				htons( ipv6format[0]),
 				htons( ipv6format[1]),
 				htons( ipv6format[2]),
@@ -1003,7 +1005,11 @@ CString LookupAccountNameFromPID(
         snprintf( pathFile, 32, "/proc/%d/loginuid", ProcessId );
         fp = fopen( pathFile, "r" );
         if (fp != NULL) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
             fscanf( fp, "%d", &uid );
+#pragma GCC diagnostic pop
+
             fclose( fp );
         }
     }
