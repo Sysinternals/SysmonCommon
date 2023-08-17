@@ -35,7 +35,7 @@
 // Pipe defines
 //
 #define BUFSIZE			65536
-#define PIPE_TIMEOUT	10000	
+#define PIPE_TIMEOUT	10000
 
 //
 // Dump configuration defines
@@ -79,7 +79,11 @@ VOID ConfigUsage( _In_ CONSOLE_SCREEN_BUFFER_INFO* csbi );
 // In ParseCommandLine.c
 //
 BOOLEAN ParseCommandLine( _In_ int argc, _In_ TCHAR** argv, _In_ PVOID* Rules, _In_ PULONG RulesSize,
-    _In_ PTCHAR *ConfigFile, _In_ PTCHAR ConfigHash, _In_ SIZE_T ConfigHashSize);
+    _In_ PTCHAR *ConfigFile, _In_ PTCHAR ConfigHash, _In_ SIZE_T ConfigHashSize
+#if defined __linux__
+	, _In_ BOOLEAN Transform
+#endif
+	);
 PTCHAR StringListDup( _In_ PTCHAR List, _In_opt_ PULONG FinalLength);
 BOOLEAN LoadVariableFieldSizes(PCTSTR FieldSizeStr);
 int GetVariableFieldSize(ULONG EventId, ULONG FieldId);
@@ -174,7 +178,7 @@ extern CRITICAL_SECTION g_DebugModePrintCriticalSection;
 #ifndef AMD64
 typedef BOOL (__stdcall *PISWOW64PROCESS)(
 			HANDLE hProcess,
-			PBOOL Wow64Process 
+			PBOOL Wow64Process
 			);
 #endif
 

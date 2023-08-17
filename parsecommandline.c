@@ -692,6 +692,9 @@ ParseCommandLine(
 	_In_ PTCHAR *ConfigFile,
 	_In_ PTCHAR ConfigHash,
 	_In_ SIZE_T ConfigHashSize
+#if defined __linux__
+    , _In_ BOOLEAN Transform
+#endif
 	)
 {
 	int			 i, j;
@@ -705,6 +708,7 @@ ParseCommandLine(
 	size_t       num_written, num_read;
 	PTCHAR       internalRepresentation = NULL;
 #if defined _WIN64 || defined _WIN32
+    BOOLEAN Transform = FALSE;
 	struct _stat dumpStat;
 #elif defined __linux__
     struct stat  dumpStat;
@@ -865,18 +869,18 @@ ParseCommandLine(
 	//
 	// Parse configuration
 	//
-	if( !ApplyConfigurationFile( configuration, Rules, RulesSize, FALSE ) ) {
+	if( !ApplyConfigurationFile( configuration, Rules, RulesSize, Transform ) ) {
 
 		return FALSE;
 	}
 	else {
-		
+
 		if( configuration != NULL ) {
 
-			// 
+			//
 			// Get hash for inclusion in event log
 			//
-			*ConfigFile = configuration; 
+			*ConfigFile = configuration;
 #if defined _WIN64 || defined _WIN32
 			GetFileHash( SysmonCryptoCurrent(), configuration, ConfigHash, ConfigHashSize, TRUE );
 #endif
